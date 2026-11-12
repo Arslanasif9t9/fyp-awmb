@@ -1,20 +1,39 @@
-# AI World Model Builder
+# AI World Model Builder (fyp-awmb)
 
 An Autonomous Multimodal World Intelligence and Simulation Engine (GCUF FYP, 2026-2027).
+
+Turns mixed files (text, PDF, images, tables, links) into a persistent, evidence-tagged,
+versioned "world". Users can question it and test "what if" ideas.
 
 ## Folder structure
 
 - `backend/`   FastAPI app (API, auth, world engine)
-- `frontend/`  React app (premium UI)
+- `frontend/`  React app (premium UI) - Phase 2
 - `docs/`      Handoff, phases, decisions
-- `docker-compose.yml`  PostgreSQL for local dev
+- `awmb.bat`   Short commands for Windows
+- `docker-compose.yml`  Optional local PostgreSQL (not used now)
 - `.env.example`        Copy to `.env` and fill
 
-## Quick start (Phase 0)
+## Requirements
 
-1. Copy `.env.example` to `.env`
-2. Run `docker compose up -d` (starts PostgreSQL)
-3. Backend and frontend come in Phase 1 and Phase 2
+- Python 3.12 (`py -3.12`)
+- Git
+- A free Supabase project (Postgres)
 
-See `docs/HANDOFF.md` for current status.
-"# fyp-awmb" 
+## Quick start
+
+Open PowerShell in this folder:
+
+```powershell
+.\awmb setup      # first time: venv + packages (creates .env if missing)
+# open .env and fill DATABASE_URL and JWT_SECRET
+.\awmb migrate    # create database tables
+.\awmb admin      # create the admin user
+.\awmb run        # start backend -> http://localhost:8000/docs
+```
+
+Other commands: `.\awmb test` (run tests).
+
+## Status
+
+See `docs/HANDOFF.md` for the current phase, decisions and API list.
