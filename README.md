@@ -46,16 +46,21 @@ Open PowerShell in this folder:
 .\awmb migrate    # create database tables
 .\awmb admin      # create the admin user
 .\awmb run        # start backend -> http://localhost:8000/docs
-Other commands: .\awmb test (run tests).
+```
 
-Status
-Phase 1 complete: backend foundation, auth (JWT + bcrypt), world CRUD, migrations.
+Other commands: `.\awmb test` (run tests).
 
-Next: Phase 2 (frontend base) + Phase 2.5 (schema for files, evidence, change_log, user_claims).
+---
 
-Full plan, decisions, and API list: see docs/HANDOFF.md.
+## Status
 
-Documentation
-docs/HANDOFF.md — single source of truth for decisions, phases, API surface, and status.
+- **Phase 1 complete:** backend foundation, auth (JWT + bcrypt), world CRUD, migrations.
+- **Next:** Phase 2 (frontend base) + Phase 2.5 (schema for `files`, `evidence`, `change_log`, `user_claims`).
+- **Full plan, decisions, and API list:** see [`docs/HANDOFF.md`](docs/HANDOFF.md).
 
-AI_World_Model_Builder_FYP_Proposal.pdf — full FYP proposal (scope, objectives, requirements).
+---
+
+## Documentation
+
+- [`docs/HANDOFF.md`](docs/HANDOFF.md) — single source of truth for decisions, phases, API surface, and status.
+- `AI_World_Model_Builder_FYP_Proposal.pdf` — full FYP proposal (scope, objectives, requirements).
