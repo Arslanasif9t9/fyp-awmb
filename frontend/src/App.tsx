@@ -34,6 +34,7 @@ function App() {
             <AppLayout>
               <Routes>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/worlds" element={<Dashboard />} />
                 <Route path="/world/:id" element={<WorldDetail />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />
