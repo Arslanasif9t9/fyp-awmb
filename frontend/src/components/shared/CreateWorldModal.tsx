@@ -10,8 +10,8 @@ import { api } from '../../lib/api';
 
 const schema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  domain: z.string().min(2, 'Domain is required'),
-  purpose: z.string().min(10, 'Purpose must be at least 10 characters'),
+  domain: z.enum(['general', 'news_incident', 'city_traffic']), // Backend limits
+  purpose: z.string().min(3, 'Purpose must be at least 3 characters'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -26,6 +26,9 @@ export const CreateWorldModal = ({ isOpen, onClose, onSuccess }: CreateWorldModa
   const [isLoading, setIsLoading] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      domain: 'general' // Default value
+    }
   });
 
   const onSubmit = async (data: FormData) => {
@@ -37,7 +40,17 @@ export const CreateWorldModal = ({ isOpen, onClose, onSuccess }: CreateWorldModa
       onSuccess();
       onClose();
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to create world');
+      let errorMessage = 'Failed to create world';
+      
+      // 422 Error ko safely handle karo (Screen black hone se bachao)
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map((err: any) => err.msg).join(', ');
+        } else {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -72,12 +85,21 @@ export const CreateWorldModal = ({ isOpen, onClose, onSuccess }: CreateWorldModa
             {...register('name')}
             error={errors.name?.message}
           />
-          <Input
-            label="Domain"
-            placeholder="e.g. Economics, Technology, Environment"
-            {...register('domain')}
-            error={errors.domain?.message}
-          />
+          
+          {/* Domain Dropdown */}
+          <div className="w-full flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Domain</label>
+            <select
+              {...register('domain')}
+              className="flex h-10 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200"
+            >
+              <option value="general">General</option>
+              <option value="news_incident">News / Incident</option>
+              <option value="city_traffic">City Traffic</option>
+            </select>
+            {errors.domain && <span className="text-xs text-red-500">{errors.domain.message}</span>}
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Purpose</label>
             <textarea
