@@ -9,6 +9,8 @@ import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
 import { WorldDetail } from './pages/WorldDetail'
+import { Settings } from './pages/Settings'
+import { NotFound } from './pages/NotFound'
 
 function App() {
   const { theme } = useThemeStore()
@@ -33,6 +35,8 @@ function App() {
               <Routes>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/world/:id" element={<WorldDetail />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </AppLayout>
           } />
