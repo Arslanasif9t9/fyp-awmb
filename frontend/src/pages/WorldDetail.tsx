@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Plus, Network } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
 import type { World } from '../types';
 import { cn } from '../lib/utils';
+import { WorldGraph } from '../components/graph/WorldGraph'; // <-- Import Graph
 
 export const WorldDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +42,7 @@ export const WorldDetail = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'graph', label: 'Graph View', icon: Network }, // <-- Naya Tab
     { id: 'files', label: 'Files', icon: FileText },
     { id: 'qa', label: 'Ask Q&A', icon: MessageSquare },
     { id: 'contradictions', label: 'Contradictions', icon: AlertTriangle },
@@ -93,6 +95,19 @@ export const WorldDetail = () => {
             <p className="text-foreground/60 max-w-md mx-auto">
               Here you will see a summary of your world, including stats about files, entities, and recent activity. This section is coming in the next phase.
             </p>
+          </div>
+        )}
+
+        {/* Naya Graph Tab */}
+        {activeTab === 'graph' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Knowledge Graph</h3>
+              <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">
+                ⚡ Mock Data (Demo)
+              </span>
+            </div>
+            <WorldGraph />
           </div>
         )}
 
