@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, AuthResponse } from '../types';
+import type { User, AuthResponse } from '../types'; // <-- Yahan 'type' add kiya hai
 import { api } from '../lib/api';
 
 interface AuthState {
