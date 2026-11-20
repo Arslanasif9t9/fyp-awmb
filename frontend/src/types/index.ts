@@ -12,3 +12,18 @@ export interface AuthResponse {
   token_type: string;
   user: User;
 }
+
+export interface World {
+  id: string;
+  name: string;
+  domain: string;
+  purpose: string;
+  current_version: number;
+  created_at: string;
+}
+
+export interface CreateWorldIn {
+  name: string;
+  domain: string;
+  purpose: string;
+}

@@ -6,9 +6,10 @@ import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { Dashboard } from './pages/Dashboard'
 
-// Temporary Dashboard
-const Dashboard = () => <div className="text-2xl font-bold">Dashboard Coming Soon</div>
+// Temporary Placeholder for World Detail (Step 10)
+const WorldDetail = () => <div className="text-2xl font-bold">World Detail Coming Soon</div>
 
 function App() {
   const { theme } = useThemeStore()
@@ -21,17 +22,16 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/*" element={
             <AppLayout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/world/:id" element={<WorldDetail />} />
               </Routes>
             </AppLayout>
           } />
