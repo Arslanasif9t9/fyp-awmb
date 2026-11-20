@@ -7,9 +7,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
-
-// Temporary Placeholder for World Detail (Step 10)
-const WorldDetail = () => <div className="text-2xl font-bold">World Detail Coming Soon</div>
+import { WorldDetail } from './pages/WorldDetail'
 
 function App() {
   const { theme } = useThemeStore()
