@@ -1,31 +1,45 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { useThemeStore } from './store/theme'
+import { AppLayout } from './components/layout/AppLayout'
 
-// Temporary Placeholders (baad mein inko proper pages se replace karenge)
-const Landing = () => <div className="p-10 text-3xl font-bold text-primary">Landing Page Coming Soon</div>
-const Login = () => <div className="p-10 text-3xl font-bold text-primary">Login Page Coming Soon</div>
-const Dashboard = () => <div className="p-10 text-3xl font-bold text-primary">Dashboard Coming Soon</div>
+// Temporary Pages
+const Dashboard = () => <div className="text-2xl font-bold">Dashboard Page</div>
+const Worlds = () => <div className="text-2xl font-bold">My Worlds Page</div>
+const Settings = () => <div className="text-2xl font-bold">Settings Page</div>
+const Login = () => <div className="text-2xl font-bold">Login Page (No Sidebar)</div>
 
 function App() {
+  const { theme } = useThemeStore()
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
   return (
     <Router>
-      <div className="min-h-screen bg-background text-foreground">
-        {/* Temporary Navbar just to test routing */}
-        <nav className="flex gap-4 p-4 bg-card border-b">
-          <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-          <Link to="/login" className="hover:text-primary transition-colors">Login</Link>
-          <Link to="/dashboard" className="hover:text-primary transition-colors">Dashboard</Link>
-        </nav>
-
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
+      <Routes>
+        {/* Public Route */}
+        <Route path="/login" element={<Login />} />
         
-        {/* Toaster for notifications */}
-        <Toaster position="top-right" richColors />
-      </div>
+        {/* Protected Routes with Layout */}
+        <Route path="/*" element={
+          <AppLayout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/worlds" element={<Worlds />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </AppLayout>
+        } />
+      </Routes>
+      <Toaster position="top-right" richColors />
     </Router>
   )
 }

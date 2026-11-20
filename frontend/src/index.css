@@ -1,30 +1,43 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: 'Inter', sans-serif;
-  --color-primary: #6366F1;
-  --color-primary-foreground: #FFFFFF;
-  --color-accent: #14B8A6;
-  --color-accent-foreground: #FFFFFF;
-  --color-background: #FAFBFC;
-  --color-foreground: #1E293B;
-  --color-card: #FFFFFF;
-  --color-card-foreground: #1E293B;
-  --color-border: #E2E8F0;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --border: 214 32% 91%;
-    --primary: 239 84% 67%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 173 80% 40%;
-    --accent-foreground: 0 0% 100%;
+    --background: 250 250 252;
+    --foreground: 15 23 42;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --border: 226 232 240;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
+    --accent: 20 184 166;
+    --accent-foreground: 255 255 255;
   }
+
+  .dark {
+    --background: 10 14 26;
+    --foreground: 241 245 249;
+    --card: 21 27 46;
+    --card-foreground: 241 245 249;
+    --border: 30 41 59;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
+    --accent: 20 184 166;
+    --accent-foreground: 255 255 255;
+  }
+}
+
+@theme inline {
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-border: rgb(var(--border));
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
 }
 
 @layer base {
@@ -32,6 +45,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
   }
 }
