@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import User, World, File as DBFile
+from ..models import User, World, File as DBFile, Evidence # <-- Evidence import kiya
 from ..schemas import FileOut
 from ..config import get_settings
+from ..services.parser import extract_text, chunk_text # <-- Parser import kiya
 
 router = APIRouter(prefix="/worlds", tags=["Files"])
 settings = get_settings()
@@ -36,11 +37,9 @@ async def upload_file(
 ):
     world = _get_own_world(db, user, world_id)
     
-    # Safe way to get settings (agar .env mein na ho to default use karega)
     max_mb = getattr(settings, "max_upload_mb", 25)
     upload_dir = getattr(settings, "upload_dir", "./uploads")
     
-    # Check file size
     max_size = max_mb * 1024 * 1024
     file.file.seek(0, 2)
     file_size = file.file.tell()
@@ -48,20 +47,18 @@ async def upload_file(
     if file_size > max_size:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"File too large. Max {max_mb}MB")
 
-    # Save file locally
     os.makedirs(upload_dir, exist_ok=True)
     ext = os.path.splitext(file.filename)[1]
     safe_filename = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(upload_dir, safe_filename)
     
-    # Save and calculate SHA256
     sha256_hash = hashlib.sha256()
     with open(file_path, "wb") as buffer:
         while chunk := file.file.read(8192):
             sha256_hash.update(chunk)
             buffer.write(chunk)
 
-    # Create DB Record
+    # DB Record for File
     db_file = DBFile(
         world_id=world.id,
         filename=file.filename,
@@ -72,6 +69,24 @@ async def upload_file(
         uploaded_by=user.id
     )
     db.add(db_file)
+    db.flush() # Flush taake db_file.id generate ho jaye (commit se pehle)
+
+    # Extract Text & Chunk
+    extracted_text = extract_text(file_path, db_file.file_type)
+    if extracted_text:
+        chunks = chunk_text(extracted_text)
+        for i, chunk in enumerate(chunks):
+            evidence = Evidence(
+                world_id=world.id,
+                file_id=db_file.id,
+                claim_text=chunk,
+                source_type="file",
+                reliability="HIGH", # Documents are high reliability
+                chunk_ref=f"chunk_{i}",
+                status="ACTIVE"
+            )
+            db.add(evidence)
+
     db.commit()
     db.refresh(db_file)
     
