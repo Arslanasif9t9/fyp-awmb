@@ -11,6 +11,7 @@ from ..models import User, World, File as DBFile, Evidence # <-- Evidence import
 from ..schemas import FileOut
 from ..config import get_settings
 from ..services.parser import extract_text, chunk_text # <-- Parser import kiya
+from ..models import User, World, File as DBFile, Evidence, ChangeLog
 
 router = APIRouter(prefix="/worlds", tags=["Files"])
 settings = get_settings()
@@ -122,3 +123,77 @@ def get_file_evidence(
             Evidence.status == "ACTIVE"
         ).order_by(Evidence.created_at.asc())
     ).all()
+
+
+
+@router.post("/{world_id}/files/{file_id}/deactivate", response_model=FileOut)
+def deactivate_file(
+    world_id: uuid.UUID,
+    file_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = _get_own_world(db, user, world_id)
+    db_file = db.scalar(select(DBFile).where(DBFile.id == file_id, DBFile.world_id == world.id))
+    if not db_file:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+    
+    if db_file.status == "INACTIVE":
+        return db_file # Already inactive
+
+    db_file.status = "INACTIVE"
+    from datetime import datetime, timezone
+    db_file.deactivated_at = datetime.now(timezone.utc)
+    db_file.deactivated_by = user.id
+
+    # Log the change
+    log = ChangeLog(
+        world_id=world.id,
+        action="DEACTIVATE",
+        target_type="file",
+        target_id=db_file.id,
+        old_state="ACTIVE",
+        new_state="INACTIVE",
+        performed_by=user.id
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(db_file)
+    return db_file
+
+
+@router.post("/{world_id}/files/{file_id}/reactivate", response_model=FileOut)
+def reactivate_file(
+    world_id: uuid.UUID,
+    file_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = _get_own_world(db, user, world_id)
+    db_file = db.scalar(select(DBFile).where(DBFile.id == file_id, DBFile.world_id == world.id))
+    if not db_file:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+    
+    if db_file.status == "ACTIVE":
+        return db_file # Already active
+
+    db_file.status = "ACTIVE"
+    db_file.deactivated_at = None
+    db_file.deactivated_by = None
+
+    # Log the change
+    log = ChangeLog(
+        world_id=world.id,
+        action="REACTIVATE",
+        target_type="file",
+        target_id=db_file.id,
+        old_state="INACTIVE",
+        new_state="ACTIVE",
+        performed_by=user.id
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(db_file)
+    return db_file
+
+

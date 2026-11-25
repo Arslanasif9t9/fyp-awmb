@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
-import type { World, FileOut, EvidenceOut } from '../types'; // EvidenceOut add kiya
+import type { World, FileOut, EvidenceOut } from '../types';
 import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
@@ -50,6 +50,21 @@ export const WorldDetail = () => {
       setIsEvidenceModalOpen(true);
     } catch (error) {
       toast.error('Failed to load evidence');
+    }
+  };
+
+  // NAYA: Deactivate/Reactivate Handler
+  const handleToggleStatus = async (file: FileOut, action: 'deactivate' | 'reactivate') => {
+    if (action === 'deactivate' && !window.confirm("Are you sure you want to deactivate this file? It will be hidden from AI queries.")) {
+      return;
+    }
+
+    try {
+      await api.post(`/worlds/${id}/files/${file.id}/${action}`);
+      toast.success(`File ${action}d successfully`);
+      fetchWorldAndFiles(); // Refresh list
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || `Failed to ${action} file`);
     }
   };
 
@@ -184,29 +199,46 @@ export const WorldDetail = () => {
               ) : (
                 <div className="space-y-3">
                   {files.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between bg-background p-4 rounded-xl border border-border hover:border-primary/30 transition-colors">
+                    <div key={file.id} className={cn(
+                      "flex items-center justify-between p-4 rounded-xl border transition-colors",
+                      file.status === 'ACTIVE' ? "bg-background border-border hover:border-primary/30" : "bg-background/50 border-border/50 opacity-70"
+                    )}>
                       <div className="flex items-center gap-4 overflow-hidden">
                         <div className="bg-card p-2.5 rounded-lg border border-border">
                           {getFileIcon(file.file_type)}
                         </div>
                         <div>
-                          <p className="font-semibold text-sm truncate max-w-md">{file.filename}</p>
+                          <p className={cn("font-semibold text-sm truncate max-w-md", file.status !== 'ACTIVE' && "line-through text-foreground/50")}>
+                            {file.filename}
+                          </p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs text-foreground/50">
                               {new Date(file.uploaded_at).toLocaleDateString()}
                             </span>
-                            <span className="text-[10px] uppercase font-bold bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full">
+                            <span className={cn(
+                              "text-[10px] uppercase font-bold px-2 py-0.5 rounded-full",
+                              file.status === 'ACTIVE' ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"
+                            )}>
                               {file.status}
                             </span>
                           </div>
                         </div>
                       </div>
                       
-                      {/* Yahan View Text button add kiya hai */}
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button variant="outline" size="sm" onClick={() => handleViewEvidence(file)}>
                           View Text
                         </Button>
+                        
+                        {file.status === 'ACTIVE' ? (
+                          <Button variant="danger" size="sm" onClick={() => handleToggleStatus(file, 'deactivate')}>
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button variant="primary" size="sm" onClick={() => handleToggleStatus(file, 'reactivate')}>
+                            Reactivate
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -247,7 +279,6 @@ export const WorldDetail = () => {
         )}
       </div>
 
-      {/* Yahan Evidence Modal add kiya hai */}
       <EvidenceModal 
         isOpen={isEvidenceModalOpen} 
         onClose={() => setIsEvidenceModalOpen(false)} 
