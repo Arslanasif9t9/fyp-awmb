@@ -69,4 +69,14 @@ class EvidenceOut(BaseModel):
     chunk_ref: str | None
     created_at: datetime
 
+class ChangeLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    action: str
+    target_type: str
+    target_id: uuid.UUID
+    old_state: str | None
+    new_state: str | None
+    performed_at: datetime
 

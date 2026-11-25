@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import User, World
-from ..schemas import WorldCreate, WorldOut
+from ..models import User, World, ChangeLog
+from ..schemas import WorldCreate, WorldOut, ChangeLogOut
+from sqlalchemy import select, desc
 
 router = APIRouter(prefix="/worlds", tags=["Worlds"])
 
@@ -63,3 +64,17 @@ def delete_world(
     db.delete(world)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("/{world_id}/history", response_model=list[ChangeLogOut])
+def get_world_history(
+    world_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = _get_own_world(db, user, world_id)
+    return db.scalars(
+        select(ChangeLog)
+        .where(ChangeLog.world_id == world.id)
+        .order_by(ChangeLog.performed_at.desc())
+    ).all()
+

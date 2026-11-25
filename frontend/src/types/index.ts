@@ -42,3 +42,14 @@ export interface EvidenceOut {
   chunk_ref: string | null;
   created_at: string;
 }
+
+export interface ChangeLogOut {
+  id: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  old_state: string | null;
+  new_state: string | null;
+  performed_at: string;
+}
+

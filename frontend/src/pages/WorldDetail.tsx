@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet, History, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
-import type { World, FileOut, EvidenceOut } from '../types';
+import type { World, FileOut, EvidenceOut, ChangeLogOut } from '../types';
 import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
@@ -15,6 +15,7 @@ export const WorldDetail = () => {
   const navigate = useNavigate();
   const [world, setWorld] = useState<World | null>(null);
   const [files, setFiles] = useState<FileOut[]>([]);
+  const [history, setHistory] = useState<ChangeLogOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFileForEvidence, setSelectedFileForEvidence] = useState<FileOut | null>(null);
@@ -22,14 +23,16 @@ export const WorldDetail = () => {
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const fetchWorldAndFiles = useCallback(async () => {
+  const fetchWorldData = useCallback(async () => {
     try {
-      const [worldRes, filesRes] = await Promise.all([
+      const [worldRes, filesRes, historyRes] = await Promise.all([
         api.get(`/worlds/${id}`),
-        api.get(`/worlds/${id}/files`)
+        api.get(`/worlds/${id}/files`),
+        api.get(`/worlds/${id}/history`)
       ]);
       setWorld(worldRes.data);
       setFiles(filesRes.data);
+      setHistory(historyRes.data);
     } catch (error) {
       toast.error('Failed to load world details');
       navigate('/dashboard');
@@ -39,8 +42,8 @@ export const WorldDetail = () => {
   }, [id, navigate]);
 
   useEffect(() => {
-    fetchWorldAndFiles();
-  }, [fetchWorldAndFiles]);
+    fetchWorldData();
+  }, [fetchWorldData]);
 
   const handleViewEvidence = async (file: FileOut) => {
     try {
@@ -53,7 +56,6 @@ export const WorldDetail = () => {
     }
   };
 
-  // NAYA: Deactivate/Reactivate Handler
   const handleToggleStatus = async (file: FileOut, action: 'deactivate' | 'reactivate') => {
     if (action === 'deactivate' && !window.confirm("Are you sure you want to deactivate this file? It will be hidden from AI queries.")) {
       return;
@@ -62,7 +64,7 @@ export const WorldDetail = () => {
     try {
       await api.post(`/worlds/${id}/files/${file.id}/${action}`);
       toast.success(`File ${action}d successfully`);
-      fetchWorldAndFiles(); // Refresh list
+      fetchWorldData(); // Refresh list and history
     } catch (error: any) {
       toast.error(error.response?.data?.detail || `Failed to ${action} file`);
     }
@@ -80,7 +82,7 @@ export const WorldDetail = () => {
         });
       }
       toast.success('Files uploaded successfully!');
-      fetchWorldAndFiles();
+      fetchWorldData();
     } catch (error: any) {
       let errorMessage = 'Failed to upload files';
       if (error.response?.data?.detail) {
@@ -120,6 +122,7 @@ export const WorldDetail = () => {
     { id: 'graph', label: 'Graph View', icon: Network },
     { id: 'files', label: 'Files', icon: FileText },
     { id: 'qa', label: 'Ask Q&A', icon: MessageSquare },
+    { id: 'history', label: 'History', icon: History }, // <-- Naya History Tab
     { id: 'contradictions', label: 'Contradictions', icon: AlertTriangle },
     { id: 'timeline', label: 'Timeline', icon: Calendar },
   ];
@@ -245,6 +248,56 @@ export const WorldDetail = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* NAYA: History Tab Content */}
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Change History</h3>
+              <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">
+                Audit Trail
+              </span>
+            </div>
+            
+            {history.length === 0 ? (
+              <div className="text-center py-12">
+                <History className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
+                <h3 className="text-lg font-bold mb-2">No history yet</h3>
+                <p className="text-foreground/60">Actions like uploading or deactivating files will appear here.</p>
+              </div>
+            ) : (
+              <div className="relative border-l border-border ml-4 space-y-8 pb-4">
+                {history.map((log) => (
+                  <div key={log.id} className="relative pl-6">
+                    <div className={cn(
+                      "absolute -left-3 top-1 h-6 w-6 rounded-full border-2 border-background flex items-center justify-center",
+                      log.action === 'DEACTIVATE' ? "bg-yellow-500/20" : "bg-green-500/20"
+                    )}>
+                      {log.action === 'DEACTIVATE' ? (
+                        <ArrowDownCircle className="h-4 w-4 text-yellow-500" />
+                      ) : (
+                        <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                    <div className="bg-background border border-border p-4 rounded-xl shadow-sm">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-semibold text-sm">
+                          {log.action === 'DEACTIVATE' ? 'File Deactivated' : 'File Reactivated'}
+                        </p>
+                        <span className="text-xs text-foreground/50">
+                          {new Date(log.performed_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground/70">
+                        A {log.target_type} item was changed from <span className="font-mono text-xs bg-card px-1 rounded">{log.old_state}</span> to <span className="font-mono text-xs bg-card px-1 rounded">{log.new_state}</span>.
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
