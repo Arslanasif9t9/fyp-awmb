@@ -45,12 +45,24 @@ export const WorldDetail = () => {
         const formData = new FormData();
         formData.append('file', file);
         
-        await api.post(`/worlds/${id}/files`, formData);
+        // Yahan headers add karna zaroori hai (Masla 2 ka fix)
+        await api.post(`/worlds/${id}/files`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       }
       toast.success('Files uploaded successfully!');
-      fetchWorldAndFiles(); // Refresh list
+      fetchWorldAndFiles();
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to upload files');
+      // SAFE ERROR HANDLING (Crash fix)
+      let errorMessage = 'Failed to upload files';
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map((err: any) => err.msg).join(', ');
+        } else {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
     }
