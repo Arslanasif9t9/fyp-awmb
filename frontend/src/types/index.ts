@@ -40,6 +40,7 @@ export interface EvidenceOut {
   id: string;
   claim_text: string;
   chunk_ref: string | null;
+  status: string; // <-- Add karo
   created_at: string;
 }
 

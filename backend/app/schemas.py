@@ -67,6 +67,7 @@ class EvidenceOut(BaseModel):
     id: uuid.UUID
     claim_text: str
     chunk_ref: str | None
+    status: str # <-- Ye add karo
     created_at: datetime
 
 class ChangeLogOut(BaseModel):
