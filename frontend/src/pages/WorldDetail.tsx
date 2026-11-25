@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import type { World } from '../types';
 import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph'; // <-- Import Graph
+import { FileUploader } from '../components/shared/FileUploader';
 
 export const WorldDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -112,17 +113,31 @@ export const WorldDetail = () => {
         )}
 
         {activeTab === 'files' && (
-          <div className="text-center py-12">
-            <div className="bg-background w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-border">
-              <FileText className="h-8 w-8 text-foreground/40" />
+          <div className="space-y-6">
+             <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">World Files</h3>
             </div>
-            <h3 className="text-lg font-bold mb-2">No files uploaded yet</h3>
-            <p className="text-foreground/60 max-w-md mx-auto mb-6">
-              Upload PDFs, images, or text files to start building your world model.
-            </p>
-            <Button disabled className="gap-2">
-              <Plus className="h-4 w-4" /> Upload File (Coming Soon)
-            </Button>
+            
+            {/* Naya File Uploader */}
+            <FileUploader 
+              onUpload={async (files) => {
+                // Step 3 mein hum isko API se connect karenge
+                console.log("Files selected for upload:", files);
+                toast.success(`${files.length} file(s) ready for backend integration!`);
+                await new Promise(r => setTimeout(r, 1000)); // Fake loading
+              }} 
+              isUploading={false} 
+            />
+
+            <div className="text-center py-12 border-t border-border mt-8">
+              <div className="bg-background w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-border">
+                <FileText className="h-8 w-8 text-foreground/40" />
+              </div>
+              <h3 className="text-lg font-bold mb-2">No files uploaded yet</h3>
+              <p className="text-foreground/60 max-w-md mx-auto">
+                Once you upload files above, they will appear here.
+              </p>
+            </div>
           </div>
         )}
 

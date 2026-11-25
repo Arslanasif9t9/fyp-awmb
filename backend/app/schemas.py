@@ -51,3 +51,13 @@ class WorldOut(BaseModel):
     current_version: int
     created_at: datetime
     updated_at: datetime
+
+class FileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    filename: str
+    file_type: str
+    status: str
+    uploaded_at: datetime
+
