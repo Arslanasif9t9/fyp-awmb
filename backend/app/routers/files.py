@@ -73,3 +73,14 @@ async def upload_file(
     db.refresh(db_file)
     
     return db_file
+
+@router.get("/{world_id}/files", response_model=list[FileOut])
+def list_files(
+    world_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = _get_own_world(db, user, world_id)
+    return db.scalars(
+        select(DBFile).where(DBFile.world_id == world.id).order_by(DBFile.uploaded_at.desc())
+    ).all()

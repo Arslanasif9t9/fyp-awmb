@@ -1,35 +1,71 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Plus, Network } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
-import type { World } from '../types';
+import type { World, FileOut } from '../types';
 import { cn } from '../lib/utils';
-import { WorldGraph } from '../components/graph/WorldGraph'; // <-- Import Graph
+import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
 
 export const WorldDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [world, setWorld] = useState<World | null>(null);
+  const [files, setFiles] = useState<FileOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
-  useEffect(() => {
-    const fetchWorld = async () => {
-      try {
-        const response = await api.get(`/worlds/${id}`);
-        setWorld(response.data);
-      } catch (error) {
-        toast.error('Failed to load world details');
-        navigate('/dashboard');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchWorld();
+  const fetchWorldAndFiles = useCallback(async () => {
+    try {
+      const [worldRes, filesRes] = await Promise.all([
+        api.get(`/worlds/${id}`),
+        api.get(`/worlds/${id}/files`)
+      ]);
+      setWorld(worldRes.data);
+      setFiles(filesRes.data);
+    } catch (error) {
+      toast.error('Failed to load world details');
+      navigate('/dashboard');
+    } finally {
+      setIsLoading(false);
+    }
   }, [id, navigate]);
+
+  useEffect(() => {
+    fetchWorldAndFiles();
+  }, [fetchWorldAndFiles]);
+
+  const handleUpload = async (selectedFiles: File[]) => {
+    setIsUploading(true);
+    try {
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        await api.post(`/worlds/${id}/files`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      toast.success('Files uploaded successfully!');
+      fetchWorldAndFiles(); // Refresh list
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    switch(type) {
+      case 'pdf': return <FileText className="h-5 w-5 text-red-500" />;
+      case 'image': return <ImageIcon className="h-5 w-5 text-blue-500" />;
+      case 'excel': return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+      default: return <FileIcon className="h-5 w-5 text-gray-500" />;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -43,7 +79,7 @@ export const WorldDetail = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'graph', label: 'Graph View', icon: Network }, // <-- Naya Tab
+    { id: 'graph', label: 'Graph View', icon: Network },
     { id: 'files', label: 'Files', icon: FileText },
     { id: 'qa', label: 'Ask Q&A', icon: MessageSquare },
     { id: 'contradictions', label: 'Contradictions', icon: AlertTriangle },
@@ -99,7 +135,6 @@ export const WorldDetail = () => {
           </div>
         )}
 
-        {/* Naya Graph Tab */}
         {activeTab === 'graph' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
@@ -113,30 +148,40 @@ export const WorldDetail = () => {
         )}
 
         {activeTab === 'files' && (
-          <div className="space-y-6">
-             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">World Files</h3>
-            </div>
-            
-            {/* Naya File Uploader */}
-            <FileUploader 
-              onUpload={async (files) => {
-                // Step 3 mein hum isko API se connect karenge
-                console.log("Files selected for upload:", files);
-                toast.success(`${files.length} file(s) ready for backend integration!`);
-                await new Promise(r => setTimeout(r, 1000)); // Fake loading
-              }} 
-              isUploading={false} 
-            />
+          <div className="space-y-8">
+            <FileUploader onUpload={handleUpload} isUploading={isUploading} />
 
-            <div className="text-center py-12 border-t border-border mt-8">
-              <div className="bg-background w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-border">
-                <FileText className="h-8 w-8 text-foreground/40" />
-              </div>
-              <h3 className="text-lg font-bold mb-2">No files uploaded yet</h3>
-              <p className="text-foreground/60 max-w-md mx-auto">
-                Once you upload files above, they will appear here.
-              </p>
+            <div className="border-t border-border pt-8">
+              <h3 className="text-lg font-bold mb-4">Uploaded Files ({files.length})</h3>
+              
+              {files.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-foreground/60">No files uploaded yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {files.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between bg-background p-4 rounded-xl border border-border hover:border-primary/30 transition-colors">
+                      <div className="flex items-center gap-4 overflow-hidden">
+                        <div className="bg-card p-2.5 rounded-lg border border-border">
+                          {getFileIcon(file.file_type)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm truncate max-w-md">{file.filename}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-foreground/50">
+                              {new Date(file.uploaded_at).toLocaleDateString()}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full">
+                              {file.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

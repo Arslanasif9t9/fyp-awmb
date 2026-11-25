@@ -27,3 +27,11 @@ export interface CreateWorldIn {
   domain: string;
   purpose: string;
 }
+
+export interface FileOut {
+  id: string;
+  filename: string;
+  file_type: string;
+  status: string;
+  uploaded_at: string;
+}
