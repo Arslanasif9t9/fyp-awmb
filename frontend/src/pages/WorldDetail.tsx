@@ -45,9 +45,7 @@ export const WorldDetail = () => {
         const formData = new FormData();
         formData.append('file', file);
         
-        await api.post(`/worlds/${id}/files`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.post(`/worlds/${id}/files`, formData);
       }
       toast.success('Files uploaded successfully!');
       fetchWorldAndFiles(); // Refresh list

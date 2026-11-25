@@ -1,6 +1,5 @@
 import os
 import uuid
-import shutil
 import hashlib
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy import select
@@ -37,19 +36,23 @@ async def upload_file(
 ):
     world = _get_own_world(db, user, world_id)
     
-    # Check file size (from .env MAX_UPLOAD_MB)
-    max_size = settings.max_upload_mb * 1024 * 1024
+    # Safe way to get settings (agar .env mein na ho to default use karega)
+    max_mb = getattr(settings, "max_upload_mb", 25)
+    upload_dir = getattr(settings, "upload_dir", "./uploads")
+    
+    # Check file size
+    max_size = max_mb * 1024 * 1024
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
     if file_size > max_size:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"File too large. Max {settings.max_upload_mb}MB")
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"File too large. Max {max_mb}MB")
 
     # Save file locally
-    os.makedirs(settings.upload_dir, exist_ok=True)
+    os.makedirs(upload_dir, exist_ok=True)
     ext = os.path.splitext(file.filename)[1]
     safe_filename = f"{uuid.uuid4().hex}{ext}"
-    file_path = os.path.join(settings.upload_dir, safe_filename)
+    file_path = os.path.join(upload_dir, safe_filename)
     
     # Save and calculate SHA256
     sha256_hash = hashlib.sha256()
