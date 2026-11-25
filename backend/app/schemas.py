@@ -61,3 +61,12 @@ class FileOut(BaseModel):
     status: str
     uploaded_at: datetime
 
+class EvidenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    claim_text: str
+    chunk_ref: str | None
+    created_at: datetime
+
+

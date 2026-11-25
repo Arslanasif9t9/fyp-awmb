@@ -35,3 +35,10 @@ export interface FileOut {
   status: string;
   uploaded_at: string;
 }
+
+export interface EvidenceOut {
+  id: string;
+  claim_text: string;
+  chunk_ref: string | null;
+  created_at: string;
+}

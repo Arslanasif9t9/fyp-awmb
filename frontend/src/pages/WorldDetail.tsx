@@ -4,10 +4,11 @@ import { toast } from 'sonner';
 import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
-import type { World, FileOut } from '../types';
+import type { World, FileOut, EvidenceOut } from '../types'; // EvidenceOut add kiya
 import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
+import { EvidenceModal } from '../components/shared/EvidenceModal';
 
 export const WorldDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,9 @@ export const WorldDetail = () => {
   const [files, setFiles] = useState<FileOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFileForEvidence, setSelectedFileForEvidence] = useState<FileOut | null>(null);
+  const [evidenceList, setEvidenceList] = useState<EvidenceOut[]>([]);
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
   const fetchWorldAndFiles = useCallback(async () => {
@@ -38,6 +42,17 @@ export const WorldDetail = () => {
     fetchWorldAndFiles();
   }, [fetchWorldAndFiles]);
 
+  const handleViewEvidence = async (file: FileOut) => {
+    try {
+      const response = await api.get(`/worlds/${id}/files/${file.id}/evidence`);
+      setEvidenceList(response.data);
+      setSelectedFileForEvidence(file);
+      setIsEvidenceModalOpen(true);
+    } catch (error) {
+      toast.error('Failed to load evidence');
+    }
+  };
+
   const handleUpload = async (selectedFiles: File[]) => {
     setIsUploading(true);
     try {
@@ -45,7 +60,6 @@ export const WorldDetail = () => {
         const formData = new FormData();
         formData.append('file', file);
         
-        // Yahan headers add karna zaroori hai (Masla 2 ka fix)
         await api.post(`/worlds/${id}/files`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -53,7 +67,6 @@ export const WorldDetail = () => {
       toast.success('Files uploaded successfully!');
       fetchWorldAndFiles();
     } catch (error: any) {
-      // SAFE ERROR HANDLING (Crash fix)
       let errorMessage = 'Failed to upload files';
       if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
@@ -188,6 +201,13 @@ export const WorldDetail = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Yahan View Text button add kiya hai */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => handleViewEvidence(file)}>
+                          View Text
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -226,6 +246,14 @@ export const WorldDetail = () => {
           </div>
         )}
       </div>
+
+      {/* Yahan Evidence Modal add kiya hai */}
+      <EvidenceModal 
+        isOpen={isEvidenceModalOpen} 
+        onClose={() => setIsEvidenceModalOpen(false)} 
+        evidence={evidenceList}
+        filename={selectedFileForEvidence?.filename || ''}
+      />
     </div>
   );
 };

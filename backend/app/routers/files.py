@@ -102,3 +102,23 @@ def list_files(
     return db.scalars(
         select(DBFile).where(DBFile.world_id == world.id).order_by(DBFile.uploaded_at.desc())
     ).all()
+
+
+from ..schemas import FileOut, EvidenceOut
+from ..models import Evidence
+
+@router.get("/{world_id}/files/{file_id}/evidence", response_model=list[EvidenceOut])
+def get_file_evidence(
+    world_id: uuid.UUID,
+    file_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = _get_own_world(db, user, world_id)
+    return db.scalars(
+        select(Evidence).where(
+            Evidence.world_id == world.id, 
+            Evidence.file_id == file_id,
+            Evidence.status == "ACTIVE"
+        ).order_by(Evidence.created_at.asc())
+    ).all()
