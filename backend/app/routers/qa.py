@@ -1,14 +1,16 @@
 import uuid
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import User, World, Evidence
-from ..schemas import QARequest, QAResponse, EvidenceOut
+from ..schemas import QARequest, EvidenceOut
 from ..services.embedder import get_embedding
-from ..services.ai_service import generate_answer
+from ..services.ai_service import generate_answer_stream
 
 router = APIRouter(prefix="/worlds", tags=["Q&A"])
 
@@ -18,8 +20,8 @@ def _get_own_world(db: Session, user: User, world_id: uuid.UUID) -> World:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "World not found")
     return world
 
-@router.post("/{world_id}/qa", response_model=QAResponse)
-def ask_question(
+@router.post("/{world_id}/qa-stream")
+async def ask_question_stream(
     world_id: uuid.UUID,
     data: QARequest,
     user: User = Depends(get_current_user),
@@ -27,39 +29,46 @@ def ask_question(
 ):
     world = _get_own_world(db, user, world_id)
     
-    # 1. Sawal ko vector (embedding) mein convert karo
-    question_embedding = get_embedding(data.question)
-    
-    if not question_embedding:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Could not process the question.")
+    async def event_generator():
+        try:
+            # Stage 1: Embedding (Thinking)
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Understanding your question...'})}\n\n"
+            question_embedding = get_embedding(data.question)
+            
+            # Stage 2: Searching DB
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Searching evidence...'})}\n\n"
+            relevant_evidence = db.scalars(
+                select(Evidence)
+                .where(
+                    Evidence.world_id == world.id,
+                    Evidence.status == "ACTIVE",
+                    Evidence.embedding.isnot(None)
+                )
+                .order_by(Evidence.embedding.cosine_distance(question_embedding))
+                .limit(5)
+            ).all()
 
-    # 2. Database mein Semantic Search chalao (Cosine Distance)
-    # Hum sirf ACTIVE evidence dhoondenge aur top 5 sab se related chunks lenge
-    relevant_evidence = db.scalars(
-        select(Evidence)
-        .where(
-            Evidence.world_id == world.id,
-            Evidence.status == "ACTIVE",
-            Evidence.embedding.isnot(None) # Sirf un chunks ke liye jinka embedding bana hai
-        )
-        .order_by(Evidence.embedding.cosine_distance(question_embedding))
-        .limit(5)
-    ).all()
+            if not relevant_evidence:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'No evidence found. Please upload files first.'})}\n\n"
+                return
 
-    if not relevant_evidence:
-        return QAResponse(
-            answer="I cannot find any evidence in this world to answer your question. Please upload files first.",
-            citations=[]
-        )
+            context_chunks = [ev.claim_text for ev in relevant_evidence]
+            citations_data = [EvidenceOut.model_validate(ev).model_dump(mode='json') for ev in relevant_evidence]
 
-    # 3. Context chunks nikaalo
-    context_chunks = [ev.claim_text for ev in relevant_evidence]
+            # Stage 3: AI Generation
+            yield f"data: {json.dumps({'type': 'status', 'message': 'AI is thinking...'})}\n\n"
+            
+            # Stream tokens
+            for text_chunk in generate_answer_stream(data.question, context_chunks):
+                yield f"data: {json.dumps({'type': 'token', 'text': text_chunk})}\n\n"
 
-    # 4. AI se jawab mangwao
-    ai_answer = generate_answer(data.question, context_chunks)
+            # Stage 4: Send Citations
+            yield f"data: {json.dumps({'type': 'citations', 'data': citations_data})}\n\n"
+            
+            # Done
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
-    # 5. Response return karo (citations ke sath)
-    return QAResponse(
-        answer=ai_answer,
-        citations=[EvidenceOut.model_validate(ev) for ev in relevant_evidence]
-    )
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

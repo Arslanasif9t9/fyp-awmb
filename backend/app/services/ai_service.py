@@ -1,15 +1,14 @@
-import time
 from google import genai
+from groq import Groq
 from ..config import get_settings
 
 settings = get_settings()
 
-client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+groq_client = Groq(api_key=settings.groq_api_key) if settings.groq_api_key else None
 
-def generate_answer(question: str, context_chunks: list[str]) -> str:
-    """AI ko sirf diye gaye context ke hisaab se jawab dene ke liye kehta hai."""
-    if not client:
-        return "AI API key is missing. Please configure GEMINI_API_KEY in the backend."
+def generate_answer_stream(question: str, context_chunks: list[str]):
+    """AI se live stream (yield) karta hai. Pehle Gemini, fail ho to Groq."""
     
     context_text = "\n\n".join([f"--- Source {i+1} ---\n{chunk}" for i, chunk in enumerate(context_chunks)])
     
@@ -24,24 +23,35 @@ User Question: {question}
 
 Answer:"""
 
-    # Retry Logic: Agar 503 (Busy) aaye to 3 baar tak koshish karo
-    max_retries = 3
-    for attempt in range(max_retries):
+    # 1. Try Gemini First (Streaming)
+    if gemini_client:
         try:
-            response = client.models.generate_content(
+            response = gemini_client.models.generate_content_stream(
                 model='gemini-3.8-flash',
                 contents=prompt
             )
-            return response.text
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+            return # Agar Gemini chal gaya, to yahin se wapas
         except Exception as e:
-            error_str = str(e)
-            # Agar error 503/429/UNAVAILABLE hai to wait karke retry karo
-            if ('503' in error_str or '429' in error_str or 'UNAVAILABLE' in error_str):
-                if attempt < max_retries - 1:
-                    wait_time = (attempt + 1) * 3  # 3, 6 seconds
-                    print(f"[AI] Busy, retrying in {wait_time}s... (Attempt {attempt+1}/{max_retries})")
-                    time.sleep(wait_time)
-                    continue
-            return f"AI Error: {str(e)}"
-    
-    return "AI service is temporarily busy. Please try again in a few seconds."
+            print(f"Gemini failed: {e}. Falling back to Groq...")
+
+    # 2. Fallback to Groq (Streaming)
+    if groq_client:
+        try:
+            # Llama 3.3 70B Groq par sab se fast aur best free model hai
+            response = groq_client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+                stream=True
+            )
+            for chunk in response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+            return
+        except Exception as e:
+            yield f"\n\n**AI Error:** Both Gemini and Groq failed. ({str(e)})"
+            return
+
+    yield "\n\n**AI Error:** No API keys configured."
