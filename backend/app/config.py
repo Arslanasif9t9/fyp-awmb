@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     jwt_secret: str = "change_me"
     jwt_expire_minutes: int = 720
     frontend_url: str = "http://localhost:5173"
+    # Ye nayi lines add karo:
+    gemini_api_key: str | None = None
+    groq_api_key: str | None = None
+    ollama_base_url: str = "http://localhost:11434"
 
     @field_validator("database_url")
     @classmethod

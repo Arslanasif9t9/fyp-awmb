@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import get_db
-from .routers import admin, auth, worlds
-from .routers import admin, auth, worlds, files
+from .routers import admin, auth, worlds, files, qa
 
 settings = get_settings()
 log = logging.getLogger("awmb")
@@ -37,6 +36,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(worlds.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(qa.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["System"])

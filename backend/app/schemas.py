@@ -81,3 +81,10 @@ class ChangeLogOut(BaseModel):
     new_state: str | None
     performed_at: datetime
 
+class QARequest(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+
+class QAResponse(BaseModel):
+    answer: str
+    citations: list[EvidenceOut]
+
