@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
 
 
 class User(Base):
@@ -99,6 +100,7 @@ class Evidence(Base):
     source_type: Mapped[str] = mapped_column(String(20), default="file", server_default="file")
     reliability: Mapped[str] = mapped_column(String(10), default="MEDIUM", server_default="MEDIUM")
     chunk_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(384), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE", server_default="ACTIVE")
     superseded_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("evidence.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

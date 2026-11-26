@@ -12,6 +12,7 @@ from ..models import User, World, File as DBFile, Evidence, ChangeLog
 from ..schemas import FileOut, EvidenceOut
 from ..config import get_settings
 from ..services.parser import extract_text, chunk_text
+from ..services.embedder import get_embedding # <-- IMPORT ADD KIYA
 
 router = APIRouter(prefix="/worlds", tags=["Files"])
 settings = get_settings()
@@ -82,7 +83,8 @@ async def upload_file(
                 source_type="file",
                 reliability="HIGH",
                 chunk_ref=f"chunk_{i}",
-                status="ACTIVE"
+                status="ACTIVE",
+                embedding=get_embedding(chunk) # <-- YAHAN ADD KIYA HAI
             )
             db.add(evidence)
 
