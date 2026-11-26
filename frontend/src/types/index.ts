@@ -54,3 +54,8 @@ export interface ChangeLogOut {
   performed_at: string;
 }
 
+export interface QAResponse {
+  answer: string;
+  citations: EvidenceOut[];
+}
+

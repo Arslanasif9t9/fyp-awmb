@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
 import { EvidenceModal } from '../components/shared/EvidenceModal';
+import { QAChat } from '../components/shared/QAChat';
 
 export const WorldDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -302,13 +303,7 @@ export const WorldDetail = () => {
         )}
 
         {activeTab === 'qa' && (
-          <div className="text-center py-12">
-            <MessageSquare className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
-            <h3 className="text-lg font-bold mb-2">Ask Questions</h3>
-            <p className="text-foreground/60 max-w-md mx-auto">
-              Once files are uploaded and processed, you can ask questions here and get answers strictly based on your uploaded evidence.
-            </p>
-          </div>
+          <QAChat worldId={world.id} />
         )}
 
         {activeTab === 'contradictions' && (
