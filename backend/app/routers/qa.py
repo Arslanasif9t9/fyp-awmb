@@ -1,5 +1,6 @@
 import uuid
 import json
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -10,15 +11,17 @@ from ..deps import get_current_user
 from ..models import User, World, Evidence
 from ..schemas import QARequest, EvidenceOut
 from ..services.embedder import get_embedding
-from ..services.ai_service import generate_answer_stream
+from ..services.ai_service import generate_answer_async
 
 router = APIRouter(prefix="/worlds", tags=["Q&A"])
+
 
 def _get_own_world(db: Session, user: User, world_id: uuid.UUID) -> World:
     world = db.scalar(select(World).where(World.id == world_id, World.user_id == user.id))
     if world is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "World not found")
     return world
+
 
 @router.post("/{world_id}/qa-stream")
 async def ask_question_stream(
@@ -28,15 +31,16 @@ async def ask_question_stream(
     db: Session = Depends(get_db),
 ):
     world = _get_own_world(db, user, world_id)
-    
+
     async def event_generator():
         try:
-            # Stage 1: Embedding (Thinking)
             yield f"data: {json.dumps({'type': 'status', 'message': 'Understanding your question...'})}\n\n"
-            question_embedding = get_embedding(data.question)
-            
-            # Stage 2: Searching DB
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Searching evidence...'})}\n\n"
+
+            # Embedding (run in thread so it doesn't block event loop)
+            question_embedding = await asyncio.to_thread(get_embedding, data.question)
+
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Searching your evidence...'})}\n\n"
+
             relevant_evidence = db.scalars(
                 select(Evidence)
                 .where(
@@ -49,26 +53,33 @@ async def ask_question_stream(
             ).all()
 
             if not relevant_evidence:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'No evidence found. Please upload files first.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'message': 'No evidence found. Upload files first.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
 
             context_chunks = [ev.claim_text for ev in relevant_evidence]
             citations_data = [EvidenceOut.model_validate(ev).model_dump(mode='json') for ev in relevant_evidence]
 
-            # Stage 3: AI Generation
-            yield f"data: {json.dumps({'type': 'status', 'message': 'AI is thinking...'})}\n\n"
-            
-            # Stream tokens
-            for text_chunk in generate_answer_stream(data.question, context_chunks):
-                yield f"data: {json.dumps({'type': 'token', 'text': text_chunk})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'AI is analyzing your evidence...'})}\n\n"
 
-            # Stage 4: Send Citations
+            # Async call with timeout - no blocking
+            answer = await generate_answer_async(data.question, context_chunks)
+
+            # Simulate streaming (word chunks) for typing feel
+            words = answer.split(' ')
+            buffer = ''
+            for i, word in enumerate(words):
+                buffer += word + ' '
+                if (i + 1) % 3 == 0 or i == len(words) - 1:
+                    yield f"data: {json.dumps({'type': 'token', 'text': buffer})}\n\n"
+                    buffer = ''
+                    await asyncio.sleep(0.03)
+
             yield f"data: {json.dumps({'type': 'citations', 'data': citations_data})}\n\n"
-            
-            # Done
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
         except Exception as e:
+            print(f"[QA Stream Error] {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
