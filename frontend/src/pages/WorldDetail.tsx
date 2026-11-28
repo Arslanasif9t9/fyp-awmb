@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet, History, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertOctagon, Sparkles } from 'lucide-react';
+import { 
+  ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, 
+  LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, 
+  FileSpreadsheet, History, ArrowDownCircle, ArrowUpCircle, 
+  RefreshCw, AlertOctagon, Sparkles, Download 
+} from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
 import type { World, FileOut, EvidenceOut, ChangeLogOut, ContradictionOut } from '../types';
@@ -50,18 +55,18 @@ export const WorldDetail = () => {
     }
   }, [id, navigate]);
 
-  useEffect(() => {
-    fetchWorldData();
+  useEffect(() => { 
+    fetchWorldData(); 
   }, [fetchWorldData]);
 
   const handleViewEvidence = async (file: FileOut) => {
     try {
       const response = await api.get(`/worlds/${id}/files/${file.id}/evidence`);
-      setEvidenceList(response.data);
-      setSelectedFileForEvidence(file);
+      setEvidenceList(response.data); 
+      setSelectedFileForEvidence(file); 
       setIsEvidenceModalOpen(true);
-    } catch (error) {
-      toast.error('Failed to load evidence');
+    } catch (error) { 
+      toast.error('Failed to load evidence'); 
     }
   };
 
@@ -69,10 +74,10 @@ export const WorldDetail = () => {
     if (action === 'deactivate' && !window.confirm("Are you sure you want to deactivate this file? It will be hidden from AI queries.")) return;
     try {
       await api.post(`/worlds/${id}/files/${file.id}/${action}`);
-      toast.success(`File ${action}d successfully`);
+      toast.success(`File ${action}d successfully`); 
       fetchWorldData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || `Failed to ${action} file`);
+    } catch (error: any) { 
+      toast.error(error.response?.data?.detail || `Failed to ${action} file`); 
     }
   };
 
@@ -82,10 +87,10 @@ export const WorldDetail = () => {
     try {
       await api.post(`/worlds/${id}/files/${selectedFileForEvidence.id}/evidence/${evidenceItem.id}/${action}`);
       const response = await api.get(`/worlds/${id}/files/${selectedFileForEvidence.id}/evidence`);
-      setEvidenceList(response.data);
+      setEvidenceList(response.data); 
       toast.success(`Chunk ${action}d successfully`);
-    } catch (error) {
-      toast.error('Failed to update evidence status');
+    } catch (error) { 
+      toast.error('Failed to update evidence status'); 
     }
   };
 
@@ -93,15 +98,13 @@ export const WorldDetail = () => {
     setIsUploading(true);
     try {
       for (const file of selectedFiles) {
-        const formData = new FormData();
+        const formData = new FormData(); 
         formData.append('file', file);
-        await api.post(`/worlds/${id}/files`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.post(`/worlds/${id}/files`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       }
-      toast.success('Files uploaded successfully!');
+      toast.success('Files uploaded successfully!'); 
       fetchWorldData();
-    } catch (error: any) {
+    } catch (error: any) { 
       let errorMessage = 'Failed to upload files';
       if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
@@ -111,35 +114,51 @@ export const WorldDetail = () => {
         }
       }
       toast.error(errorMessage);
-    } finally {
-      setIsUploading(false);
+    } finally { 
+      setIsUploading(false); 
     }
   };
 
   const handleExtractGraph = async () => {
-    setIsExtracting(true);
+    setIsExtracting(true); 
     toast.info("Extracting entities and relations from files. This may take a minute...");
-    try {
-      await api.post(`/worlds/${id}/extract-graph`);
-      toast.success("Graph extracted successfully! Check the Graph tab.");
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Extraction failed");
-    } finally {
-      setIsExtracting(false);
+    try { 
+      await api.post(`/worlds/${id}/extract-graph`); 
+      toast.success("Graph extracted successfully! Check the Graph tab."); 
+    } catch (error: any) { 
+      toast.error(error.response?.data?.detail || "Extraction failed"); 
+    } finally { 
+      setIsExtracting(false); 
     }
   };
 
   const handleDetectContradictions = async () => {
-    setIsDetecting(true);
+    setIsDetecting(true); 
     toast.info("AI is analyzing chunks for contradictions...");
     try {
       const res = await api.post(`/worlds/${id}/detect-contradictions`);
-      toast.success(`Detection complete. Found ${res.data.contradictions_found} conflicts.`);
+      toast.success(`Detection complete. Found ${res.data.contradictions_found} conflicts.`); 
       fetchWorldData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Detection failed");
-    } finally {
-      setIsDetecting(false);
+    } catch (error: any) { 
+      toast.error(error.response?.data?.detail || "Detection failed"); 
+    } finally { 
+      setIsDetecting(false); 
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const response = await api.get(`/worlds/${id}/export`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${world?.name.replace(/\s+/g, '_')}_export.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("World exported successfully!");
+    } catch (error) {
+      toast.error("Export failed");
     }
   };
 
@@ -175,19 +194,30 @@ export const WorldDetail = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="px-2">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{world.name}</h1>
-            <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">{world.domain}</span>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="px-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{world.name}</h1>
+              <span className="text-xs font-medium bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+                {world.domain}
+              </span>
+            </div>
+            <p className="text-sm text-foreground/60 mt-1">{world.purpose}</p>
           </div>
-          <p className="text-sm text-foreground/60 mt-1">{world.purpose}</p>
         </div>
+        
+        {/* Export Button */}
+        <Button variant="outline" onClick={handleExport} className="gap-2 shrink-0">
+          <Download className="h-4 w-4" /> Export JSON
+        </Button>
       </div>
 
+      {/* Tabs Navigation */}
       <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
         {tabs.map((tab) => (
           <button
@@ -206,13 +236,16 @@ export const WorldDetail = () => {
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">
+      {/* Tab Content Area */}
+      <div className="bg-card border border-border rounded-xl p-4 md:p-6 min-h-[400px]">
         
         {activeTab === 'overview' && (
           <div className="text-center py-12">
             <LayoutDashboard className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
             <h3 className="text-lg font-bold mb-2">World Overview</h3>
-            <p className="text-foreground/60 max-w-md mx-auto">Here you will see a summary of your world, including stats about files, entities, and recent activity.</p>
+            <p className="text-foreground/60 max-w-md mx-auto">
+              Stats, recent activity, and world summary will appear here in the final version.
+            </p>
           </div>
         )}
 
@@ -221,7 +254,9 @@ export const WorldDetail = () => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Knowledge Graph</h3>
               <div className="flex gap-2 items-center">
-                <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">Real Data</span>
+                <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border hidden md:block">
+                  Real Data
+                </span>
                 <Button size="sm" onClick={handleExtractGraph} isLoading={isExtracting} className="gap-2">
                   <RefreshCw className="h-3 w-3" /> Extract Graph
                 </Button>
@@ -234,35 +269,56 @@ export const WorldDetail = () => {
         {activeTab === 'files' && (
           <div className="space-y-8">
             <FileUploader onUpload={handleUpload} isUploading={isUploading} />
+            
             <div className="border-t border-border pt-8">
               <h3 className="text-lg font-bold mb-4">Uploaded Files ({files.length})</h3>
+              
               {files.length === 0 ? (
-                <div className="text-center py-8"><p className="text-foreground/60">No files uploaded yet.</p></div>
+                <div className="text-center py-8">
+                  <p className="text-foreground/60">No files uploaded yet.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {files.map((file) => (
                     <div key={file.id} className={cn(
-                      "flex items-center justify-between p-4 rounded-xl border transition-colors",
+                      "flex flex-col md:flex-row items-start md:items-center justify-between p-4 rounded-xl border transition-colors gap-4",
                       file.status === 'ACTIVE' ? "bg-background border-border hover:border-primary/30" : "bg-background/50 border-border/50 opacity-70"
                     )}>
-                      <div className="flex items-center gap-4 overflow-hidden">
-                        <div className="bg-card p-2.5 rounded-lg border border-border">{getFileIcon(file.file_type)}</div>
-                        <div>
-                          <p className={cn("font-semibold text-sm truncate max-w-md", file.status !== 'ACTIVE' && "line-through text-foreground/50")}>{file.filename}</p>
+                      <div className="flex items-center gap-4 overflow-hidden w-full">
+                        <div className="bg-card p-2.5 rounded-lg border border-border shrink-0">
+                          {getFileIcon(file.file_type)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={cn("font-semibold text-sm truncate", file.status !== 'ACTIVE' && "line-through text-foreground/50")}>
+                            {file.filename}
+                          </p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-foreground/50">{new Date(file.uploaded_at).toLocaleDateString()}</span>
-                            <span className={cn("text-[10px] uppercase font-bold px-2 py-0.5 rounded-full",
+                            <span className="text-xs text-foreground/50">
+                              {new Date(file.uploaded_at).toLocaleDateString()}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] uppercase font-bold px-2 py-0.5 rounded-full",
                               file.status === 'ACTIVE' ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"
-                            )}>{file.status}</span>
+                            )}>
+                              {file.status}
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => handleViewEvidence(file)}>View Text</Button>
+                      
+                      <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+                        <Button variant="outline" size="sm" onClick={() => handleViewEvidence(file)} className="flex-1 md:flex-none">
+                          View Text
+                        </Button>
+                        
                         {file.status === 'ACTIVE' ? (
-                          <Button variant="danger" size="sm" onClick={() => handleToggleStatus(file, 'deactivate')}>Deactivate</Button>
+                          <Button variant="danger" size="sm" onClick={() => handleToggleStatus(file, 'deactivate')} className="flex-1 md:flex-none">
+                            Deactivate
+                          </Button>
                         ) : (
-                          <Button variant="primary" size="sm" onClick={() => handleToggleStatus(file, 'reactivate')}>Reactivate</Button>
+                          <Button variant="primary" size="sm" onClick={() => handleToggleStatus(file, 'reactivate')} className="flex-1 md:flex-none">
+                            Reactivate
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -273,24 +329,20 @@ export const WorldDetail = () => {
           </div>
         )}
 
-        {activeTab === 'qa' && <QAChat worldId={world.id} />}
+        {activeTab === 'qa' && (
+          <QAChat worldId={world.id} />
+        )}
 
         {activeTab === 'whatif' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">What-If Simulation</h3>
-              <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">Non-Persistent</span>
-            </div>
-            <WhatIfPanel worldId={world.id} />
-          </div>
+          <WhatIfPanel worldId={world.id} />
         )}
 
         {activeTab === 'history' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Change History</h3>
-              <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">Audit Trail</span>
             </div>
+            
             {history.length === 0 ? (
               <div className="text-center py-12">
                 <History className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
@@ -301,16 +353,28 @@ export const WorldDetail = () => {
               <div className="relative border-l border-border ml-4 space-y-8 pb-4">
                 {history.map((log) => (
                   <div key={log.id} className="relative pl-6">
-                    <div className={cn("absolute -left-3 top-1 h-6 w-6 rounded-full border-2 border-background flex items-center justify-center",
-                      log.action === 'DEACTIVATE' ? "bg-yellow-500/20" : "bg-green-500/20")}>
-                      {log.action === 'DEACTIVATE' ? <ArrowDownCircle className="h-4 w-4 text-yellow-500" /> : <ArrowUpCircle className="h-4 w-4 text-green-500" />}
+                    <div className={cn(
+                      "absolute -left-3 top-1 h-6 w-6 rounded-full border-2 border-background flex items-center justify-center",
+                      log.action === 'DEACTIVATE' ? "bg-yellow-500/20" : "bg-green-500/20"
+                    )}>
+                      {log.action === 'DEACTIVATE' ? (
+                        <ArrowDownCircle className="h-4 w-4 text-yellow-500" />
+                      ) : (
+                        <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                      )}
                     </div>
                     <div className="bg-background border border-border p-4 rounded-xl shadow-sm">
                       <div className="flex justify-between items-start mb-1">
-                        <p className="font-semibold text-sm">{log.action === 'DEACTIVATE' ? 'File Deactivated' : 'File Reactivated'}</p>
-                        <span className="text-xs text-foreground/50">{new Date(log.performed_at).toLocaleString()}</span>
+                        <p className="font-semibold text-sm">
+                          {log.action === 'DEACTIVATE' ? 'File Deactivated' : 'File Reactivated'}
+                        </p>
+                        <span className="text-xs text-foreground/50">
+                          {new Date(log.performed_at).toLocaleString()}
+                        </span>
                       </div>
-                      <p className="text-sm text-foreground/70">A {log.target_type} item was changed from <span className="font-mono text-xs bg-card px-1 rounded">{log.old_state}</span> to <span className="font-mono text-xs bg-card px-1 rounded">{log.new_state}</span>.</p>
+                      <p className="text-sm text-foreground/70">
+                        A {log.target_type} item was changed from <span className="font-mono text-xs bg-card px-1 rounded">{log.old_state}</span> to <span className="font-mono text-xs bg-card px-1 rounded">{log.new_state}</span>.
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -327,18 +391,23 @@ export const WorldDetail = () => {
                 <AlertOctagon className="h-4 w-4" /> Detect Conflicts
               </Button>
             </div>
+
             {contradictions.length === 0 ? (
               <div className="text-center py-12">
                 <AlertTriangle className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
                 <h3 className="text-lg font-bold mb-2">No Contradictions Detected</h3>
-                <p className="text-foreground/60 max-w-md mx-auto mb-4">Click the button above to run AI analysis.</p>
+                <p className="text-foreground/60 max-w-md mx-auto mb-4">
+                  Click the button above to run AI analysis. The system will highlight conflicting information between your sources.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
                 {contradictions.map((c) => (
                   <div key={c.id} className="bg-red-500/5 border border-red-500/20 rounded-xl p-5">
                     <div className="flex items-start gap-3">
-                      <div className="bg-red-500/10 p-2 rounded-lg shrink-0 mt-1"><AlertTriangle className="h-5 w-5 text-red-500" /></div>
+                      <div className="bg-red-500/10 p-2 rounded-lg shrink-0 mt-1">
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                      </div>
                       <div className="space-y-3 w-full">
                         <div>
                           <h4 className="font-bold text-red-500 text-sm">AI Analysis</h4>
@@ -346,10 +415,12 @@ export const WorldDetail = () => {
                         </div>
                         <div className="grid md:grid-cols-2 gap-3 mt-3">
                           <div className="bg-background rounded-lg p-3 border border-border/50 text-xs text-foreground/70 font-mono line-clamp-4">
-                            <span className="font-bold text-foreground/40 block mb-1">Source 1:</span>"{c.evidence_1_text}"
+                            <span className="font-bold text-foreground/40 block mb-1">Source 1:</span>
+                            "{c.evidence_1_text}"
                           </div>
                           <div className="bg-background rounded-lg p-3 border border-border/50 text-xs text-foreground/70 font-mono line-clamp-4">
-                            <span className="font-bold text-foreground/40 block mb-1">Source 2:</span>"{c.evidence_2_text}"
+                            <span className="font-bold text-foreground/40 block mb-1">Source 2:</span>
+                            "{c.evidence_2_text}"
                           </div>
                         </div>
                       </div>
@@ -365,7 +436,9 @@ export const WorldDetail = () => {
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
             <h3 className="text-lg font-bold mb-2">World Timeline</h3>
-            <p className="text-foreground/60 max-w-md mx-auto">Track how your world evolves over time.</p>
+            <p className="text-foreground/60 max-w-md mx-auto">
+              Track how your world evolves over time. Every update, file addition, and contradiction will be logged here.
+            </p>
           </div>
         )}
       </div>

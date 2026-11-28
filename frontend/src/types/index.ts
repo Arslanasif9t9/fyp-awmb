@@ -102,3 +102,9 @@ export interface WhatIfResponse {
   disclaimer: string;
 }
 
+export interface WorldStats {
+  files_count: number;
+  evidence_count: number;
+  entities_count: number;
+  contradictions_count: number;
+}

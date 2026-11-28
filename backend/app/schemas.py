@@ -131,3 +131,9 @@ class WhatIfResponse(BaseModel):
     citations: list[WhatIfCitation]
     disclaimer: str
 
+class WorldStats(BaseModel):
+    files_count: int
+    evidence_count: int
+    entities_count: int
+    contradictions_count: int
+

@@ -49,3 +49,25 @@
     @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
   }
 }
+
+
+/* Fix ReactFlow dark mode */
+.react-flow__background {
+  background-color: rgb(var(--background)) !important;
+}
+.react-flow__controls {
+  background-color: rgb(var(--card)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+.react-flow__controls-button {
+  background-color: rgb(var(--card)) !important;
+  border-bottom: 1px solid rgb(var(--border)) !important;
+  fill: rgb(var(--foreground)) !important;
+}
+.react-flow__minimap {
+  background-color: rgb(var(--card)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  border-radius: 8px !important;
+}
