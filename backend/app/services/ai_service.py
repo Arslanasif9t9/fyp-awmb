@@ -84,3 +84,56 @@ async def generate_answer_async(question, context_chunks):
         print(f"[AI] Groq error: {e}")
 
     return "Both AI services are unavailable right now. Please try again in a moment."
+
+
+
+
+
+import json
+import re
+
+async def extract_entities_and_relations(text_chunk: str) -> dict:
+    """AI se text ke andar se entities aur relations nikalwata hai."""
+    prompt = f"""Extract entities and relations from the text below.
+Return ONLY a valid JSON object with this exact structure:
+{{
+  "entities": [{{"name": "Entity Name", "type": "Person|Organization|Location|Concept"}}],
+  "relations": [{{"source": "Entity 1", "target": "Entity 2", "relation": "verb_phrase"}}]
+}}
+
+Text: {text_chunk}
+"""
+    
+    # Try Gemini, fallback to Groq
+    result_text = ""
+    if gemini_client:
+        try:
+            response = await asyncio.to_thread(
+                gemini_client.models.generate_content,
+                model='gemini-2.0-flash',
+                contents=prompt
+            )
+            result_text = response.text
+        except Exception as e:
+            print(f"Gemini extraction failed: {e}")
+
+    if not result_text and groq_client:
+        try:
+            response = await asyncio.to_thread(
+                groq_client.chat.completions.create,
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result_text = response.choices[0].message.content
+        except Exception as e:
+            print(f"Groq extraction failed: {e}")
+
+    # JSON parse karo (AI kabhi kabhi markdown ```json laga deta hai)
+    try:
+        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception as e:
+        print(f"JSON Parse Error: {e}")
+    
+    return {"entities": [], "relations": []}

@@ -154,3 +154,33 @@ class ChangeLog(Base):
     metadata_json: Mapped[dict | None] = mapped_column("metadata", sa.JSON, nullable=True)
 
     world: Mapped[World] = relationship(back_populates="changes")
+
+
+class Entity(Base):
+    __tablename__ = "entities"
+    __table_args__ = (
+        CheckConstraint(STATUS_CHECK, name="ck_entities_status"),
+        Index("ix_entities_world_id", "world_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    world_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    entity_type: Mapped[str] = mapped_column(String(50)) # Person, Organization, Location, Concept
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", server_default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class Relation(Base):
+    __tablename__ = "relations"
+    __table_args__ = (
+        CheckConstraint(STATUS_CHECK, name="ck_relations_status"),
+        Index("ix_relations_world_id", "world_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    world_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
+    source_entity_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
+    target_entity_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
+    relation_type: Mapped[str] = mapped_column(String(100)) # represents, warns_about, etc.
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", server_default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
