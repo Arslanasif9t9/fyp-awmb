@@ -114,3 +114,20 @@ class ContradictionOut(BaseModel):
     status: str
     created_at: datetime
 
+class WhatIfRequest(BaseModel):
+    assumption: str = Field(min_length=5, max_length=500)
+
+class WhatIfCitation(BaseModel):
+    claim_text: str
+    source_file: str | None = None
+    chunk_ref: str | None = None
+
+class WhatIfResponse(BaseModel):
+    assumption: str
+    first_order: list[str]
+    second_order: list[str]
+    confidence: str
+    reasoning: str
+    citations: list[WhatIfCitation]
+    disclaimer: str
+

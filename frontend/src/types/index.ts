@@ -86,3 +86,19 @@ export interface ContradictionOut {
   created_at: string;
 }
 
+export interface WhatIfCitation {
+  claim_text: string;
+  source_file: string | null;
+  chunk_ref: string | null;
+}
+
+export interface WhatIfResponse {
+  assumption: string;
+  first_order: string[];
+  second_order: string[];
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  reasoning: string;
+  citations: WhatIfCitation[];
+  disclaimer: string;
+}
+

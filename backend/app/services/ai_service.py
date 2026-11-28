@@ -134,3 +134,66 @@ Chunk 2: {chunk2}
     except Exception as e:
         print(f"JSON Parse Error in Contradiction: {e}")
         return {"is_contradiction": False}
+
+
+
+async def simulate_whatif(assumption: str, context_chunks: list[str]) -> dict:
+    """What-If simulation - non-persistent, evidence-grounded."""
+    context_text = "\n\n".join([f"--- Evidence {i+1} ---\n{chunk}" for i, chunk in enumerate(context_chunks)])
+    
+    prompt = f"""You are a what-if simulation engine for a World Model Builder.
+The user has posed a hypothetical assumption. Simulate consequences using ONLY the provided evidence.
+
+CRITICAL RULES:
+- Do NOT use any outside knowledge.
+- If evidence does not support reasoning about this assumption, return empty lists.
+- First-order = direct/immediate effects. Second-order = indirect/ripple effects.
+- Confidence depends on how much evidence supports the simulation.
+
+Assumption: {assumption}
+
+Evidence:
+{context_text}
+
+Return ONLY a valid JSON object (no markdown) with this exact structure:
+{{
+  "first_order": ["immediate consequence 1", "immediate consequence 2"],
+  "second_order": ["ripple effect 1", "ripple effect 2"],
+  "confidence": "HIGH" or "MEDIUM" or "LOW",
+  "reasoning": "Brief explanation (2-3 sentences) of how you reached these conclusions from the evidence."
+}}
+"""
+    
+    result_text = ""
+    try:
+        result_text = await asyncio.wait_for(
+            asyncio.to_thread(_try_gemini, prompt), timeout=20.0
+        )
+    except: pass
+    
+    if not result_text:
+        try:
+            result_text = await asyncio.wait_for(
+                asyncio.to_thread(_try_groq, prompt), timeout=20.0
+            )
+        except: pass
+    
+    if not result_text:
+        return {
+            "first_order": [], 
+            "second_order": [], 
+            "confidence": "LOW", 
+            "reasoning": "AI services unavailable."
+        }
+    
+    try:
+        clean_json = _clean_json_response(result_text)
+        return json.loads(clean_json)
+    except Exception as e:
+        print(f"What-If JSON Parse Error: {e}")
+        return {
+            "first_order": [], 
+            "second_order": [], 
+            "confidence": "LOW", 
+            "reasoning": "Could not parse AI response."
+        }
