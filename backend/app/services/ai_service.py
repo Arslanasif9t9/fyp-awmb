@@ -1,4 +1,6 @@
 import asyncio
+import json
+import re
 from google import genai
 from groq import Groq
 from ..config import get_settings
@@ -24,11 +26,10 @@ Answer:"""
 
 
 def _try_gemini(prompt):
-    if not gemini_client:
-        return None
+    if not gemini_client: return None
     try:
         response = gemini_client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.8-flash', # Model name fixed
             contents=prompt
         )
         return response.text
@@ -38,8 +39,7 @@ def _try_gemini(prompt):
 
 
 def _try_groq(prompt):
-    if not groq_client:
-        return None
+    if not groq_client: return None
     try:
         response = groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
@@ -52,50 +52,31 @@ def _try_groq(prompt):
 
 
 async def generate_answer_async(question, context_chunks):
-    """Async with hard timeout - never hangs the backend."""
     prompt = _build_prompt(question, context_chunks)
-
-    # Try Gemini with 20s hard timeout
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_try_gemini, prompt),
-            timeout=20.0
-        )
-        if result:
-            print("[AI] Gemini responded successfully")
-            return result
-    except asyncio.TimeoutError:
-        print("[AI] Gemini timed out after 20s - falling back to Groq")
-    except Exception as e:
-        print(f"[AI] Gemini error: {e}")
-
-    # Fallback to Groq with 25s timeout
+        result = await asyncio.wait_for(asyncio.to_thread(_try_gemini, prompt), timeout=20.0)
+        if result: return result
+    except asyncio.TimeoutError: pass
+    
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_try_groq, prompt),
-            timeout=25.0
-        )
-        if result:
-            print("[AI] Groq responded successfully")
-            return result
-    except asyncio.TimeoutError:
-        print("[AI] Groq timed out after 25s")
-    except Exception as e:
-        print(f"[AI] Groq error: {e}")
-
-    return "Both AI services are unavailable right now. Please try again in a moment."
+        result = await asyncio.wait_for(asyncio.to_thread(_try_groq, prompt), timeout=25.0)
+        if result: return result
+    except asyncio.TimeoutError: pass
+    
+    return "Both AI services are unavailable right now. Please try again."
 
 
-
-
-
-import json
-import re
+# --- JSON Extraction Helpers ---
+def _clean_json_response(text: str) -> str:
+    """Removes markdown blocks and extracts the JSON string."""
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        return match.group(0)
+    return "{}"
 
 async def extract_entities_and_relations(text_chunk: str) -> dict:
-    """AI se text ke andar se entities aur relations nikalwata hai."""
     prompt = f"""Extract entities and relations from the text below.
-Return ONLY a valid JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {{
   "entities": [{{"name": "Entity Name", "type": "Person|Organization|Location|Concept"}}],
   "relations": [{{"source": "Entity 1", "target": "Entity 2", "relation": "verb_phrase"}}]
@@ -103,81 +84,53 @@ Return ONLY a valid JSON object with this exact structure:
 
 Text: {text_chunk}
 """
-    
-    # Try Gemini, fallback to Groq
     result_text = ""
-    if gemini_client:
-        try:
-            response = await asyncio.to_thread(
-                gemini_client.models.generate_content,
-                model='gemini-2.0-flash',
-                contents=prompt
-            )
-            result_text = response.text
-        except Exception as e:
-            print(f"Gemini extraction failed: {e}")
-
-    if not result_text and groq_client:
-        try:
-            response = await asyncio.to_thread(
-                groq_client.chat.completions.create,
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result_text = response.choices[0].message.content
-        except Exception as e:
-            print(f"Groq extraction failed: {e}")
-
-    # JSON parse karo (AI kabhi kabhi markdown ```json laga deta hai)
     try:
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
-    except Exception as e:
-        print(f"JSON Parse Error: {e}")
+        result_text = await asyncio.wait_for(asyncio.to_thread(_try_gemini, prompt), timeout=15.0)
+    except: pass
     
-    return {"entities": [], "relations": []}
+    if not result_text:
+        try:
+            result_text = await asyncio.wait_for(asyncio.to_thread(_try_groq, prompt), timeout=15.0)
+        except: pass
 
+    if not result_text: return {"entities": [], "relations": []}
+
+    try:
+        clean_json = _clean_json_response(result_text)
+        return json.loads(clean_json)
+    except Exception as e:
+        print(f"JSON Parse Error in Extraction: {e} | Raw: {result_text[:100]}")
+        return {"entities": [], "relations": []}
 
 
 async def check_contradiction(chunk1: str, chunk2: str) -> dict:
-    """AI se check karwata hai ke do text chunks aapas mein conflict karte hain ya nahi."""
     prompt = f"""Do these two text chunks contradict each other regarding facts, numbers, or claims?
-Return ONLY a valid JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {{
-  "is_contradiction": true/false,
-  "explanation": "Brief reason why they contradict, or 'No contradiction' if false."
+  "is_contradiction": true,
+  "explanation": "Brief reason why they contradict."
 }}
+If there is NO contradiction, return: {{"is_contradiction": false, "explanation": "No contradiction"}}
 
 Chunk 1: {chunk1}
 Chunk 2: {chunk2}
 """
-    
     result_text = ""
-    if gemini_client:
+    try:
+        result_text = await asyncio.wait_for(asyncio.to_thread(_try_gemini, prompt), timeout=15.0)
+    except: pass
+    
+    if not result_text:
         try:
-            response = await asyncio.to_thread(
-                gemini_client.models.generate_content,
-                model='gemini-2.0-flash', contents=prompt
-            )
-            result_text = response.text
-        except Exception: pass
+            result_text = await asyncio.wait_for(asyncio.to_thread(_try_groq, prompt), timeout=15.0)
+        except: pass
 
-    if not result_text and groq_client:
-        try:
-            response = await asyncio.to_thread(
-                groq_client.chat.completions.create,
-                model="openai/gpt-oss-120b",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result_text = response.choices[0].message.content
-        except Exception: pass
+    if not result_text: return {"is_contradiction": False}
 
     try:
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
+        clean_json = _clean_json_response(result_text)
+        return json.loads(clean_json)
     except Exception as e:
-        print(f"JSON Parse Error in contradiction: {e}")
-    
-    return {"is_contradiction": False, "explanation": "Failed to parse AI response."}
+        print(f"JSON Parse Error in Contradiction: {e}")
+        return {"is_contradiction": False}

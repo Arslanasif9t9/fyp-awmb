@@ -21,20 +21,21 @@ async def detect_contradictions(
     if not world:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "World not found")
 
-    # Purana data clear karo
     db.query(Contradiction).filter(Contradiction.world_id == world.id).delete()
     db.commit()
 
-    evidences = db.scalars(select(Evidence).where(Evidence.world_id == world.id, Evidence.status == "ACTIVE")).all()
+    # Limit to 5 chunks for fast processing
+    evidences = db.scalars(
+        select(Evidence)
+        .where(Evidence.world_id == world.id, Evidence.status == "ACTIVE")
+        .limit(5)
+    ).all()
     
     contradictions_found = 0
 
-    # Hum har chunk ko uske sab se qareebi (similar) chunk se compare karenge
-    # Taake O(N^2) loops se bacha ja sake
     for i, ev1 in enumerate(evidences):
         if not ev1.embedding: continue
         
-        # Find 1 most similar chunk (excluding itself)
         similar = db.scalars(
             select(Evidence)
             .where(
@@ -48,7 +49,6 @@ async def detect_contradictions(
         ).first()
 
         if similar:
-            # AI se poocho
             result = await check_contradiction(ev1.claim_text, similar.claim_text)
             
             if result.get("is_contradiction"):
@@ -63,7 +63,6 @@ async def detect_contradictions(
                 db.commit()
 
     return {"message": "Detection complete", "contradictions_found": contradictions_found}
-
 
 @router.get("/{world_id}/contradictions", response_model=list[ContradictionOut])
 def get_contradictions(

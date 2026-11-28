@@ -21,26 +21,29 @@ async def extract_graph(
     if not world:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "World not found")
 
-    # Sirf ACTIVE evidence uthao
-    evidences = db.scalars(select(Evidence).where(Evidence.world_id == world.id, Evidence.status == "ACTIVE")).all()
+    # LIMIT 10 chunks taake process fast ho
+    evidences = db.scalars(
+        select(Evidence)
+        .where(Evidence.world_id == world.id, Evidence.status == "ACTIVE")
+        .limit(10) 
+    ).all()
     
     if not evidences:
         return {"message": "No active evidence found to extract from."}
 
-    # Purana graph clear karo (fresh extraction ke liye)
+    # Purana graph clear karo
     db.query(Relation).filter(Relation.world_id == world.id).delete()
     db.query(Entity).filter(Entity.world_id == world.id).delete()
     db.commit()
 
-    entity_map = {} # Name -> Entity ID
+    entity_map = {}
 
     for ev in evidences:
         data = await extract_entities_and_relations(ev.claim_text)
         
-        # 1. Save Entities
         for ent in data.get("entities", []):
-            name = ent.get("name", "").strip()
-            ent_type = ent.get("type", "Concept").strip()
+            name = str(ent.get("name", "")).strip()
+            ent_type = str(ent.get("type", "Concept")).strip()
             if not name: continue
             
             if name.lower() not in entity_map:
@@ -49,11 +52,10 @@ async def extract_graph(
                 db.flush()
                 entity_map[name.lower()] = new_entity.id
 
-        # 2. Save Relations
         for rel in data.get("relations", []):
-            src = rel.get("source", "").strip().lower()
-            tgt = rel.get("target", "").strip().lower()
-            rel_type = rel.get("relation", "related_to").strip()
+            src = str(rel.get("source", "")).strip().lower()
+            tgt = str(rel.get("target", "")).strip().lower()
+            rel_type = str(rel.get("relation", "related_to")).strip()
             
             if src in entity_map and tgt in entity_map:
                 new_rel = Relation(
@@ -65,8 +67,7 @@ async def extract_graph(
                 db.add(new_rel)
     
     db.commit()
-    return {"message": f"Extracted {len(entity_map)} unique entities and their relations.", "entities_count": len(entity_map)}
-
+    return {"message": f"Extracted {len(entity_map)} entities.", "entities_count": len(entity_map)}
 
 @router.get("/{world_id}/graph", response_model=GraphDataOut)
 def get_graph(
