@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -10,21 +10,26 @@ import {
 } from '@xyflow/react';
 import type { Connection, Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { User, Building2, AlertTriangle, FileText } from 'lucide-react';
+import { User, Building2, AlertTriangle, FileText, Loader2, Network } from 'lucide-react';
+import { api } from '../../lib/api';
+import type { GraphDataOut } from '../../types';
+import { toast } from 'sonner';
 
-// Custom Node Component for Premium Look
+// Custom Node Component
 const CustomNode = ({ data }: any) => {
   const icons = {
-    person: <User className="h-4 w-4 text-blue-500" />,
-    organization: <Building2 className="h-4 w-4 text-purple-500" />,
-    issue: <AlertTriangle className="h-4 w-4 text-red-500" />,
-    document: <FileText className="h-4 w-4 text-green-500" />,
+    Person: <User className="h-4 w-4 text-blue-500" />,
+    Organization: <Building2 className="h-4 w-4 text-purple-500" />,
+    Location: <AlertTriangle className="h-4 w-4 text-orange-500" />,
+    Concept: <FileText className="h-4 w-4 text-green-500" />,
   };
+
+  const Icon = icons[data.type as keyof typeof icons] || <FileText className="h-4 w-4 text-gray-500" />;
 
   return (
     <div className="bg-card border-2 border-primary/50 rounded-xl px-4 py-3 shadow-xl min-w-[150px]">
       <div className="flex items-center gap-2 mb-1">
-        {icons[data.type as keyof typeof icons] || <User className="h-4 w-4" />}
+        {Icon}
         <span className="text-xs font-bold uppercase tracking-wider text-foreground/50">
           {data.type}
         </span>
@@ -34,38 +39,80 @@ const CustomNode = ({ data }: any) => {
   );
 };
 
-const nodeTypes = {
-  custom: CustomNode,
-};
+const nodeTypes = { custom: CustomNode };
 
-// Mock Data (Baad mein backend se aayega)
-const initialNodes: Node[] = [
-  { id: '1', type: 'custom', position: { x: 250, y: 50 }, data: { label: 'Ahmed', type: 'person' } },
-  { id: '2', type: 'custom', position: { x: 100, y: 200 }, data: { label: 'Property A', type: 'document' } },
-  { id: '3', type: 'custom', position: { x: 400, y: 200 }, data: { label: 'Property B', type: 'document' } },
-  { id: '4', type: 'custom', position: { x: 400, y: 350 }, data: { label: 'Agent Imran', type: 'person' } },
-  { id: '5', type: 'custom', position: { x: 600, y: 200 }, data: { label: 'Lawyer', type: 'person' } },
-  { id: '6', type: 'custom', position: { x: 250, y: 400 }, data: { label: 'Mutation Issue', type: 'issue' } },
-  { id: '7', type: 'custom', position: { x: 50, y: 400 }, data: { label: 'Meezan Bank', type: 'organization' } },
-];
+export const WorldGraph = ({ worldId }: { worldId: string }) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', label: 'interested in', animated: true, style: { stroke: '#6366F1', strokeWidth: 2 } },
-  { id: 'e1-3', source: '1', target: '3', label: 'interested in', animated: true, style: { stroke: '#6366F1', strokeWidth: 2 } },
-  { id: 'e4-3', source: '4', target: '3', label: 'represents', style: { stroke: '#14B8A6', strokeWidth: 2 } },
-  { id: 'e5-3', source: '5', target: '3', label: 'warns about', style: { stroke: '#EF4444', strokeWidth: 2 } },
-  { id: 'e6-3', source: '6', target: '3', label: 'affects', style: { stroke: '#EF4444', strokeWidth: 2, strokeDasharray: '5 5' } },
-  { id: 'e7-1', source: '7', target: '1', label: 'offers loan', style: { stroke: '#14B8A6', strokeWidth: 2 } },
-];
+  useEffect(() => {
+    const fetchGraph = async () => {
+      try {
+        const response = await api.get<GraphDataOut>(`/worlds/${worldId}/graph`);
+        const { entities, relations } = response.data;
 
-export const WorldGraph = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+        // Map Entities to React Flow Nodes
+        const newNodes: Node[] = entities.map((ent, index) => ({
+          id: ent.id,
+          type: 'custom',
+          position: {
+            // Simple circular layout
+            x: 250 + 200 * Math.cos((index / entities.length) * 2 * Math.PI),
+            y: 250 + 200 * Math.sin((index / entities.length) * 2 * Math.PI),
+          },
+          data: { label: ent.name, type: ent.entity_type },
+        }));
+
+        // Map Relations to React Flow Edges
+        const newEdges: Edge[] = relations.map((rel) => ({
+          id: rel.id,
+          source: rel.source_entity_id,
+          target: rel.target_entity_id,
+          label: rel.relation_type,
+          animated: true,
+          style: { stroke: '#6366F1', strokeWidth: 2 },
+        }));
+
+        setNodes(newNodes);
+        setEdges(newEdges);
+      } catch (error) {
+        toast.error('Failed to load graph data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGraph();
+  }, [worldId, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-[600px] flex items-center justify-center border border-border rounded-xl bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-foreground/60">Loading Knowledge Graph...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (nodes.length === 0) {
+    return (
+      <div className="w-full h-[600px] flex flex-col items-center justify-center border border-border border-dashed rounded-xl bg-background text-center p-6">
+        <Network className="h-12 w-12 text-foreground/20 mb-4" />
+        <h3 className="text-lg font-bold mb-2">Graph is empty</h3>
+        <p className="text-sm text-foreground/60 max-w-md">
+          No entities found. Go to the Files tab and trigger extraction, or upload more files.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-[600px] border border-border rounded-xl overflow-hidden bg-background">

@@ -184,3 +184,19 @@ class Relation(Base):
     relation_type: Mapped[str] = mapped_column(String(100)) # represents, warns_about, etc.
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE", server_default="ACTIVE")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Contradiction(Base):
+    __tablename__ = "contradictions"
+    __table_args__ = (
+        CheckConstraint(STATUS_CHECK, name="ck_contradictions_status"),
+        Index("ix_contradictions_world_id", "world_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    world_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("worlds.id", ondelete="CASCADE"), nullable=False)
+    evidence_1_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("evidence.id", ondelete="CASCADE"))
+    evidence_2_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("evidence.id", ondelete="CASCADE"))
+    explanation: Mapped[str] = mapped_column(Text) # AI ka explanation ke kyun conflict hai
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", server_default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

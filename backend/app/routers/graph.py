@@ -7,6 +7,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import User, World, Evidence, Entity, Relation
 from ..services.ai_service import extract_entities_and_relations
+from ..schemas import GraphDataOut, EntityOut, RelationOut
 
 router = APIRouter(prefix="/worlds", tags=["Graph"])
 
@@ -65,3 +66,22 @@ async def extract_graph(
     
     db.commit()
     return {"message": f"Extracted {len(entity_map)} unique entities and their relations.", "entities_count": len(entity_map)}
+
+
+@router.get("/{world_id}/graph", response_model=GraphDataOut)
+def get_graph(
+    world_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    world = db.scalar(select(World).where(World.id == world_id, World.user_id == user.id))
+    if not world:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "World not found")
+
+    entities = db.scalars(select(Entity).where(Entity.world_id == world.id, Entity.status == "ACTIVE")).all()
+    relations = db.scalars(select(Relation).where(Relation.world_id == world.id, Relation.status == "ACTIVE")).all()
+
+    return GraphDataOut(
+        entities=[EntityOut.model_validate(e) for e in entities],
+        relations=[RelationOut.model_validate(r) for r in relations]
+    )

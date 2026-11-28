@@ -137,3 +137,47 @@ Text: {text_chunk}
         print(f"JSON Parse Error: {e}")
     
     return {"entities": [], "relations": []}
+
+
+
+async def check_contradiction(chunk1: str, chunk2: str) -> dict:
+    """AI se check karwata hai ke do text chunks aapas mein conflict karte hain ya nahi."""
+    prompt = f"""Do these two text chunks contradict each other regarding facts, numbers, or claims?
+Return ONLY a valid JSON object with this exact structure:
+{{
+  "is_contradiction": true/false,
+  "explanation": "Brief reason why they contradict, or 'No contradiction' if false."
+}}
+
+Chunk 1: {chunk1}
+Chunk 2: {chunk2}
+"""
+    
+    result_text = ""
+    if gemini_client:
+        try:
+            response = await asyncio.to_thread(
+                gemini_client.models.generate_content,
+                model='gemini-2.0-flash', contents=prompt
+            )
+            result_text = response.text
+        except Exception: pass
+
+    if not result_text and groq_client:
+        try:
+            response = await asyncio.to_thread(
+                groq_client.chat.completions.create,
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            result_text = response.choices[0].message.content
+        except Exception: pass
+
+    try:
+        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception as e:
+        print(f"JSON Parse Error in contradiction: {e}")
+    
+    return {"is_contradiction": False, "explanation": "Failed to parse AI response."}

@@ -59,3 +59,30 @@ export interface QAResponse {
   citations: EvidenceOut[];
 }
 
+export interface EntityOut {
+  id: string;
+  name: string;
+  entity_type: string;
+}
+
+export interface RelationOut {
+  id: string;
+  source_entity_id: string;
+  target_entity_id: string;
+  relation_type: string;
+}
+
+export interface GraphDataOut {
+  entities: EntityOut[];
+  relations: RelationOut[];
+}
+
+export interface ContradictionOut {
+  id: string;
+  explanation: string;
+  evidence_1_text: string;
+  evidence_2_text: string;
+  status: string;
+  created_at: string;
+}
+

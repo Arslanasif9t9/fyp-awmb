@@ -88,3 +88,29 @@ class QAResponse(BaseModel):
     answer: str
     citations: list[EvidenceOut]
 
+class EntityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    entity_type: str
+
+class RelationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    source_entity_id: uuid.UUID
+    target_entity_id: uuid.UUID
+    relation_type: str
+
+class GraphDataOut(BaseModel):
+    entities: list[EntityOut]
+    relations: list[RelationOut]
+
+class ContradictionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    explanation: str
+    evidence_1_text: str
+    evidence_2_text: str
+    status: str
+    created_at: datetime
+

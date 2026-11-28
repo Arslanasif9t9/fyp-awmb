@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet, History, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, AlertTriangle, Calendar, LayoutDashboard, Network, File as FileIcon, Image as ImageIcon, FileSpreadsheet, History, ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertOctagon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
-import type { World, FileOut, EvidenceOut, ChangeLogOut } from '../types';
+import type { World, FileOut, EvidenceOut, ChangeLogOut, ContradictionOut } from '../types';
 import { cn } from '../lib/utils';
 import { WorldGraph } from '../components/graph/WorldGraph';
 import { FileUploader } from '../components/shared/FileUploader';
@@ -17,8 +17,13 @@ export const WorldDetail = () => {
   const [world, setWorld] = useState<World | null>(null);
   const [files, setFiles] = useState<FileOut[]>([]);
   const [history, setHistory] = useState<ChangeLogOut[]>([]);
+  const [contradictions, setContradictions] = useState<ContradictionOut[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
+  
   const [selectedFileForEvidence, setSelectedFileForEvidence] = useState<FileOut | null>(null);
   const [evidenceList, setEvidenceList] = useState<EvidenceOut[]>([]);
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
@@ -26,14 +31,16 @@ export const WorldDetail = () => {
 
   const fetchWorldData = useCallback(async () => {
     try {
-      const [worldRes, filesRes, historyRes] = await Promise.all([
+      const [worldRes, filesRes, historyRes, contRes] = await Promise.all([
         api.get(`/worlds/${id}`),
         api.get(`/worlds/${id}/files`),
-        api.get(`/worlds/${id}/history`)
+        api.get(`/worlds/${id}/history`),
+        api.get(`/worlds/${id}/contradictions`).catch(() => ({ data: [] })) // Agar route na ho to empty
       ]);
       setWorld(worldRes.data);
       setFiles(filesRes.data);
       setHistory(historyRes.data);
+      setContradictions(contRes.data);
     } catch (error) {
       toast.error('Failed to load world details');
       navigate('/dashboard');
@@ -65,9 +72,23 @@ export const WorldDetail = () => {
     try {
       await api.post(`/worlds/${id}/files/${file.id}/${action}`);
       toast.success(`File ${action}d successfully`);
-      fetchWorldData(); // Refresh list and history
+      fetchWorldData();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || `Failed to ${action} file`);
+    }
+  };
+
+  const handleToggleEvidenceStatus = async (evidenceItem: EvidenceOut, action: 'deactivate' | 'reactivate') => {
+    if (!selectedFileForEvidence) return;
+    if (action === 'deactivate' && !window.confirm("Deactivate this specific text chunk?")) return;
+
+    try {
+      await api.post(`/worlds/${id}/files/${selectedFileForEvidence.id}/evidence/${evidenceItem.id}/${action}`);
+      const response = await api.get(`/worlds/${id}/files/${selectedFileForEvidence.id}/evidence`);
+      setEvidenceList(response.data);
+      toast.success(`Chunk ${action}d successfully`);
+    } catch (error) {
+      toast.error('Failed to update evidence status');
     }
   };
 
@@ -77,7 +98,6 @@ export const WorldDetail = () => {
       for (const file of selectedFiles) {
         const formData = new FormData();
         formData.append('file', file);
-        
         await api.post(`/worlds/${id}/files`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -96,6 +116,33 @@ export const WorldDetail = () => {
       toast.error(errorMessage);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleExtractGraph = async () => {
+    setIsExtracting(true);
+    toast.info("Extracting entities and relations from files. This may take a minute...");
+    try {
+      await api.post(`/worlds/${id}/extract-graph`);
+      toast.success("Graph extracted successfully! Check the Graph tab.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Extraction failed");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleDetectContradictions = async () => {
+    setIsDetecting(true);
+    toast.info("AI is analyzing chunks for contradictions...");
+    try {
+      const res = await api.post(`/worlds/${id}/detect-contradictions`);
+      toast.success(`Detection complete. Found ${res.data.contradictions_found} conflicts.`);
+      fetchWorldData(); // Refresh contradictions
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Detection failed");
+    } finally {
+      setIsDetecting(false);
     }
   };
 
@@ -123,7 +170,7 @@ export const WorldDetail = () => {
     { id: 'graph', label: 'Graph View', icon: Network },
     { id: 'files', label: 'Files', icon: FileText },
     { id: 'qa', label: 'Ask Q&A', icon: MessageSquare },
-    { id: 'history', label: 'History', icon: History }, // <-- Naya History Tab
+    { id: 'history', label: 'History', icon: History },
     { id: 'contradictions', label: 'Contradictions', icon: AlertTriangle },
     { id: 'timeline', label: 'Timeline', icon: Calendar },
   ];
@@ -167,6 +214,7 @@ export const WorldDetail = () => {
 
       {/* Tab Content Area */}
       <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">
+        
         {activeTab === 'overview' && (
           <div className="text-center py-12">
             <LayoutDashboard className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
@@ -181,11 +229,14 @@ export const WorldDetail = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Knowledge Graph</h3>
-              <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">
-                ⚡ Mock Data (Demo)
-              </span>
+              <div className="flex gap-2 items-center">
+                <span className="text-xs text-foreground/50 bg-background px-3 py-1 rounded-full border border-border">Real Data</span>
+                <Button size="sm" onClick={handleExtractGraph} isLoading={isExtracting} className="gap-2">
+                  <RefreshCw className="h-3 w-3" /> Extract Graph
+                </Button>
+              </div>
             </div>
-            <WorldGraph />
+            <WorldGraph worldId={world.id} />
           </div>
         )}
 
@@ -252,7 +303,10 @@ export const WorldDetail = () => {
           </div>
         )}
 
-        {/* NAYA: History Tab Content */}
+        {activeTab === 'qa' && (
+          <QAChat worldId={world.id} />
+        )}
+
         {activeTab === 'history' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center mb-4">
@@ -302,17 +356,52 @@ export const WorldDetail = () => {
           </div>
         )}
 
-        {activeTab === 'qa' && (
-          <QAChat worldId={world.id} />
-        )}
-
         {activeTab === 'contradictions' && (
-          <div className="text-center py-12">
-            <AlertTriangle className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
-            <h3 className="text-lg font-bold mb-2">No Contradictions Detected</h3>
-            <p className="text-foreground/60 max-w-md mx-auto">
-              The system will automatically highlight conflicting information between your sources once files are ingested.
-            </p>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Contradictions</h3>
+              <Button onClick={handleDetectContradictions} isLoading={isDetecting} className="gap-2">
+                <AlertOctagon className="h-4 w-4" /> Detect Conflicts
+              </Button>
+            </div>
+
+            {contradictions.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertTriangle className="h-12 w-12 text-foreground/20 mx-auto mb-4" />
+                <h3 className="text-lg font-bold mb-2">No Contradictions Detected</h3>
+                <p className="text-foreground/60 max-w-md mx-auto mb-4">
+                  Click the button above to run AI analysis. The system will highlight conflicting information between your sources.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {contradictions.map((c) => (
+                  <div key={c.id} className="bg-red-500/5 border border-red-500/20 rounded-xl p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-red-500/10 p-2 rounded-lg shrink-0 mt-1">
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div className="space-y-3 w-full">
+                        <div>
+                          <h4 className="font-bold text-red-500 text-sm">AI Analysis</h4>
+                          <p className="text-sm text-foreground/80 mt-1">{c.explanation}</p>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-3 mt-3">
+                          <div className="bg-background rounded-lg p-3 border border-border/50 text-xs text-foreground/70 font-mono line-clamp-4">
+                            <span className="font-bold text-foreground/40 block mb-1">Source 1:</span>
+                            "{c.evidence_1_text}"
+                          </div>
+                          <div className="bg-background rounded-lg p-3 border border-border/50 text-xs text-foreground/70 font-mono line-clamp-4">
+                            <span className="font-bold text-foreground/40 block mb-1">Source 2:</span>
+                            "{c.evidence_2_text}"
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -332,6 +421,7 @@ export const WorldDetail = () => {
         onClose={() => setIsEvidenceModalOpen(false)} 
         evidence={evidenceList}
         filename={selectedFileForEvidence?.filename || ''}
+        onToggleStatus={handleToggleEvidenceStatus}
       />
     </div>
   );
